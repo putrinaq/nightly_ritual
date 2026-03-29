@@ -1,0 +1,41 @@
+name: nightly_ritual
+description: A Linear-style nightly manifestation and ritual app.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.2.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Required for the Cupertino icons used (e.g., CupertinoIcons.moon, heart_fill)
+  cupertino_icons: ^1.0.8
+
+  # Local storage for streak/ritual persistence
+  shared_preferences: ^2.3.0
+
+  # Spotify integration via Web API
+  url_launcher: ^6.2.5
+  http: ^1.2.0
+  flutter_web_auth_2: ^4.0.1
+
+  # Local notifications for reminders
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.0
+  permission_handler: ^11.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.13.1
+flutter:
+  uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/icon.png"
+  min_sdk_android: 21

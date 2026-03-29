@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter pub get:*)",
+      "Bash(flutter build:*)",
+      "Bash(timeout 120 tail:*)"
+    ]
+  }
+}
