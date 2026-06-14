@@ -16,7 +16,6 @@ import 'models/playlist_entry.dart';
 import 'services/auth_service.dart';
 import 'services/firestore_service.dart';
 import 'services/ritual_storage_service.dart';
-import 'services/spotify_service.dart';
 import 'services/moon_phase_service.dart';
 import 'services/notification_service.dart';
 import 'widgets/moon_phase_icon.dart';
@@ -62,10 +61,6 @@ void main() async {
   final storageService = RitualStorageService();
   await storageService.init();
 
-  // Initialize Spotify service
-  final spotifyService = SpotifyService(storageService);
-  await spotifyService.init();
-
   // Initialize notification service
   final notificationService = NotificationService();
   await notificationService.init();
@@ -82,7 +77,6 @@ void main() async {
 
   runApp(NightlyRitualApp(
     storageService: storageService,
-    spotifyService: spotifyService,
     notificationService: notificationService,
     reminderPrefs: reminderPrefs,
   ));
@@ -90,14 +84,12 @@ void main() async {
 
 class NightlyRitualApp extends StatelessWidget {
   final RitualStorageService storageService;
-  final SpotifyService spotifyService;
   final NotificationService notificationService;
   final ReminderPreferences reminderPrefs;
 
   const NightlyRitualApp({
     super.key,
     required this.storageService,
-    required this.spotifyService,
     required this.notificationService,
     required this.reminderPrefs,
   });
@@ -121,7 +113,6 @@ class NightlyRitualApp extends StatelessWidget {
       ),
       home: MainScreen(
         storageService: storageService,
-        spotifyService: spotifyService,
         notificationService: notificationService,
         reminderPrefs: reminderPrefs,
       ),
@@ -131,14 +122,12 @@ class NightlyRitualApp extends StatelessWidget {
 
 class MainScreen extends StatefulWidget {
   final RitualStorageService storageService;
-  final SpotifyService spotifyService;
   final NotificationService notificationService;
   final ReminderPreferences reminderPrefs;
 
   const MainScreen({
     super.key,
     required this.storageService,
-    required this.spotifyService,
     required this.notificationService,
     required this.reminderPrefs,
   });
@@ -228,7 +217,6 @@ class _MainScreenState extends State<MainScreen> {
           totalRituals: totalRituals,
           todayRitualCompleted: todayRitualCompleted,
           moonPhase: moonPhase,
-          spotifyService: widget.spotifyService,
           notificationService: widget.notificationService,
           reminderPrefs: widget.reminderPrefs,
           storageService: widget.storageService,
@@ -583,7 +571,6 @@ class HomePage extends StatefulWidget {
   final int totalRituals;
   final bool todayRitualCompleted;
   final MoonPhaseInfo moonPhase;
-  final SpotifyService spotifyService;
   final NotificationService notificationService;
   final ReminderPreferences reminderPrefs;
   final RitualStorageService storageService;
@@ -596,7 +583,6 @@ class HomePage extends StatefulWidget {
     required this.totalRituals,
     required this.todayRitualCompleted,
     required this.moonPhase,
-    required this.spotifyService,
     required this.notificationService,
     required this.reminderPrefs,
     required this.storageService,
@@ -673,28 +659,6 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                 ],
-              ),
-              // Spotify connection indicator
-              GestureDetector(
-                onTap: () => _showSpotifyOptions(context),
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: widget.spotifyService.isConnected
-                        ? const Color(0xFF1DB954)
-                        : Colors.redAccent,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                          color: (widget.spotifyService.isConnected
-                                  ? const Color(0xFF1DB954)
-                                  : Colors.redAccent)
-                              .withValues(alpha: 0.5),
-                          blurRadius: 10),
-                    ],
-                  ),
-                ),
               ),
             ],
           ),
@@ -1489,94 +1453,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _showSpotifyOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF0A0A0A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[700],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              widget.spotifyService.isConnected
-                  ? 'Spotify Connected'
-                  : 'Connect to Spotify',
-              style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white),
-            ),
-            const SizedBox(height: 24),
-            if (!widget.spotifyService.isConnected)
-              SizedBox(
-                width: double.infinity,
-                child: CupertinoButton(
-                  color: const Color(0xFF1DB954),
-                  borderRadius: BorderRadius.circular(12),
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    await widget.spotifyService.authenticate();
-                  },
-                  child: const Text('Connect Spotify',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w600)),
-                ),
-              )
-            else
-              Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: CupertinoButton(
-                      color: const Color(0xFF1DB954),
-                      borderRadius: BorderRadius.circular(12),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        widget.spotifyService.openSpotifyPlaylist();
-                      },
-                      child: const Text('Open Playlist',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: CupertinoButton(
-                      color: Colors.grey[800],
-                      borderRadius: BorderRadius.circular(12),
-                      onPressed: () async {
-                        await widget.spotifyService.disconnect();
-                        if (context.mounted) Navigator.pop(context);
-                      },
-                      child: const Text('Disconnect',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                ],
-              ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _showLinearTimePicker(BuildContext context, StateSetter setModalState) {
     showModalBottomSheet(

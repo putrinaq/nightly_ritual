@@ -4,9 +4,6 @@ class RitualStorageService {
   static const String _streakKey = 'streak_days';
   static const String _lastRitualDateKey = 'last_ritual_date';
   static const String _totalRitualsKey = 'total_rituals';
-  static const String _spotifyTokenKey = 'spotify_access_token';
-  static const String _spotifyRefreshTokenKey = 'spotify_refresh_token';
-  static const String _spotifyTokenExpiryKey = 'spotify_token_expiry';
   static const String _customAffirmationsKey = 'custom_affirmations';
 
   late SharedPreferences _prefs;
@@ -77,41 +74,6 @@ class RitualStorageService {
 
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
-
-  // Spotify Token Management
-  Future<void> saveSpotifyTokens({
-    required String accessToken,
-    String? refreshToken,
-    required int expiresIn,
-  }) async {
-    await _prefs.setString(_spotifyTokenKey, accessToken);
-    if (refreshToken != null) {
-      await _prefs.setString(_spotifyRefreshTokenKey, refreshToken);
-    }
-    final expiry = DateTime.now().add(Duration(seconds: expiresIn));
-    await _prefs.setString(_spotifyTokenExpiryKey, expiry.toIso8601String());
-  }
-
-  String? getSpotifyAccessToken() {
-    final expiry = _prefs.getString(_spotifyTokenExpiryKey);
-    if (expiry != null) {
-      final expiryDate = DateTime.parse(expiry);
-      if (DateTime.now().isAfter(expiryDate)) {
-        return null; // Token expired
-      }
-    }
-    return _prefs.getString(_spotifyTokenKey);
-  }
-
-  String? getSpotifyRefreshToken() {
-    return _prefs.getString(_spotifyRefreshTokenKey);
-  }
-
-  Future<void> clearSpotifyTokens() async {
-    await _prefs.remove(_spotifyTokenKey);
-    await _prefs.remove(_spotifyRefreshTokenKey);
-    await _prefs.remove(_spotifyTokenExpiryKey);
   }
 
   // Custom Affirmations (stored as "text\tcat" per entry)

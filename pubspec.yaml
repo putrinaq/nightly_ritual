@@ -15,10 +15,7 @@ dependencies:
   # Local storage for streak/ritual persistence
   shared_preferences: ^2.3.0
 
-  # Spotify integration via Web API
   url_launcher: ^6.2.5
-  http: ^1.2.0
-  flutter_web_auth_2: ^4.0.1
 
   # Local notifications for reminders
   flutter_local_notifications: ^18.0.1
