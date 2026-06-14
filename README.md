@@ -2,203 +2,402 @@
 
 <br/>
 
-<img src="https://i.pinimg.com/originals/c4/ff/27/c4ff278ae5b6940b17004ec1c1800b7f.gif" alt="banner" width="100%"/>
+<img src="https://i.pinimg.com/originals/c4/ff/27/c4ff278ae5b6940b17004ec1c1800b7f.gif" alt="nightly ritual banner" height="50%" width="100%"/>
 
 <br/><br/>
 
-# 🌙 nightly ritual
+<h1>☾ ⋆⁺₊✧ nightly ritual ✧₊⁺⋆ ☾</h1>
 
-```
-　　 ∧＿∧
-　（｡･ω･｡)つ━☆・*。
-　⊂　 ノ 　　　・゜+.
-　しーＪ　　　°。+ *´¨)
-　　　　　　　.· ´¸.·*´¨) ¸.·*¨)
-　　　　　　　　(¸.·´ (¸.·'* ✨
-```
-
-**`ˏˋ°•*⁀➷ a linear-style manifestation & ritual app`**
+<p>
+  <b>˚₊‧꒰ა ☆ ໒꒱ ‧₊˚</b>
+  <br/>
+  <i>a dreamy manifestation companion for moonlit evenings</i>
+  <br/>
+  <b>𐙚₊˚⊹♡ made for soft rituals, lucky girls & future selves ♡⊹˚₊𐙚</b>
+</p>
 
 <br/>
 
-![Flutter](https://img.shields.io/badge/Flutter-3.x-A855F7?style=for-the-badge&logo=flutter&logoColor=white&labelColor=0A0A0A)
-![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black&labelColor=0A0A0A)
-![Spotify](https://img.shields.io/badge/Spotify-1DB954?style=for-the-badge&logo=spotify&logoColor=white&labelColor=0A0A0A)
-![Firestore](https://img.shields.io/badge/Firestore-Cloud-A855F7?style=for-the-badge&logo=google-cloud&logoColor=white&labelColor=0A0A0A)
+<pre>
+⋆｡ﾟ☁︎｡⋆｡ ﾟ☾ ﾟ｡⋆
+
+　　　∧＿∧
+　　（｡･ω･｡)つ━☆・*。
+　　⊂　 ノ 　　　・゜+.
+　　しーＪ　　　°。+ *´¨)
+　　　　　　　　.· ´¸.·*´¨) ¸.·*¨)
+　　　　　　　　　(¸.·´ (¸.·'* ✨
+
+　　　make a wish, starlight ✦
+</pre>
 
 <br/>
 
-_seal your intentions under the stars, every single night_ 🌟
+<img src="https://img.shields.io/badge/Flutter-3.x-C084FC?style=for-the-badge&logo=flutter&logoColor=white&labelColor=12001F"/>
+<img src="https://img.shields.io/badge/Firebase-Moonlit%20Cloud-FFD6A5?style=for-the-badge&logo=firebase&logoColor=black&labelColor=12001F"/>
+<img src="https://img.shields.io/badge/Firestore-Dream%20Archive-C084FC?style=for-the-badge&logo=google-cloud&logoColor=white&labelColor=12001F"/>
+<img src="https://img.shields.io/badge/Moon-Magic-DBB4FF?style=for-the-badge&labelColor=12001F"/>
+
+<br/><br/>
+
+<blockquote>
+  <i>seal your intentions beneath the stars, one beautiful night at a time</i> ✨
+</blockquote>
 
 <br/>
 
 </div>
 
 ---
-
-## ✦ 　 what is this ✨ 　 ✦
-
-**Nightly Ritual** is a Flutter app that turns your nightly wind-down into a _sacred practice_. Each night you move through a guided 4-step ritual — breathing, music, affirmations, reflection — backed by real moon phase data and Spotify integration. The whole thing looks like Linear designed a mystical journal app. `(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧`
-
-Dark as midnight. Purple like magic. Synced to the cloud. ☁️💜
-
----
-
-## ✦ 　 the ritual 　 ✦
 
 <div align="center">
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│   STEP 1 🫁   ──►   STEP 2 🎵   ──►   STEP 3 ✨   ──►  STEP 4 🕯️  │
-│                                                             │
-│   Breath         Audio           Cast          Seal        │
-│   4-7-8 cycles   Spotify align   Affirmations  Reflect     │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+<h2>｡ﾟ•┈୨♡୧┈•ﾟ｡</h2>
+<h3>୨୧ what is nightly ritual? ୨୧</h3>
+<h2>｡ﾟ•┈୨♡୧┈•ﾟ｡</h2>
 
 </div>
 
-| #   | step          | description                            | vibe               |
-| --- | ------------- | -------------------------------------- | ------------------ |
-| 1   | 🌬 **Breath** | 4-7-8 resonance breathing × 4 cycles   | _inhale the magic_ |
-| 2   | 🎵 **Audio**  | frequency alignment with your Spotify  | _let the music in_ |
-| 3   | ✨ **Cast**   | speak your affirmations into existence | _manifest it_      |
-| 4   | 🕯️ **Seal**   | nightly reflection to lock the energy  | _it is done_       |
-
----
-
-## ✦ 　 features 　 ✦
-
 <br/>
 
-### 🌕 &nbsp; moon phase tracker
+<p align="center">
+  <b>Nightly Ritual</b> is a cozy manifestation app that turns your bedtime routine into a soft little ceremony.
+</p>
 
-```
-🌑 New Moon    🌒 Waxing Crescent    🌓 First Quarter    🌔 Waxing Gibbous
-🌕 Full Moon   🌖 Waning Gibbous     🌗 Last Quarter     🌘 Waning Crescent
-```
-
-The app reads the **actual current moon phase** and its illumination percentage — displayed live on your home screen, because the moon's energy shapes your ritual. `(•̀ᴗ•́)و ✧`
-
-<br/>
-
-### 🔥 &nbsp; streak tracking
-
-> _"don't break the chain"_ `(ง •̀_•́)ง`
-
-Two counters live on your home screen bento grid:
-
-- 🔥 **Day Streak** — consecutive days of completed rituals
-- ✨ **Spells Cast** — total rituals completed, all time
-
-<br/>
-
-### 💜 &nbsp; manifestation journal
-
-Write your intentions. Tag them. Release them to the universe. `˚ ༘♡ ⋆｡˚`
-
-```
-🌙 Moon Work    ✨ Manifestation   💜 Self-love      🔮 Intuition
-🌹 Attraction   💫 Abundance       🌿 Healing        🕯️ Ritual
-👑 Power        🦋 Transformation  💎 Clarity        🌊 Flow
-🔥 Passion      🌸 Beauty          ⚡ Energy         🙏 Gratitude
-```
-
-<br/>
-
-### ✅ &nbsp; habit tracker
-
-Build the micro-habits that hold your practice together. Each habit gets an emoji, a tag, and a daily check-in. `(ˊᗜˋ)و ✦`
-
-```
-🌙 Evening    🌅 Morning    💜 Self-care    🧘 Mindfulness
-💪 Fitness    📖 Learning   🌿 Wellness     💫 Spiritual
-🥗 Nutrition  😴 Sleep
-```
-
-<br/>
-
-### 🎵 &nbsp; spotify integration
-
-Connect your Spotify and build playlists _just for your ritual_. The home screen shows a glowing green dot `●` when connected — red when not. Tap it, open a playlist, and let the frequencies do their thing. `(◕‿◕✿)`
-
-<br/>
-
-### 🔔 &nbsp; daily reminders
-
-A custom push notification at whatever time you choose. Never miss your nightly ritual again — your practice is waiting. 💜
-
-<br/>
-
-### 🌟 &nbsp; starry animated background
-
-150 twinkling stars + occasional shooting stars ☆彡 — hand-painted on a Canvas behind everything. because atmosphere is everything. `｡ﾟ(ﾟ´ω｀ﾟ)ﾟ｡`
-
----
-
-## ✦ 　 design language 　 ✦
+<p align="center">
+  It helps you slow down, breathe, listen to dreamy ritual audios, write your intentions, track your habits, and reflect under the moon.
+</p>
 
 <div align="center">
 
-```
-╔══════════════════════════════════════════════════════╗
-║                                                      ║
-║   Background  ░░  #030303  — almost void black       ║
-║   Surface     ░░  #0A0A0A  — barely lifted           ║
-║   Accent      ██  #A855F7  — soft violet             ║
-║   Glow        ░░  #7C3AED  — deep indigo             ║
-║   Success     ██  #22C55E  — ritual sealed ✓         ║
-║   Spotify     ██  #1DB954  — connected               ║
-║                                                      ║
-╚══════════════════════════════════════════════════════╝
-```
+<pre>
+╭───────────── ⊹₊⟡⋆ ─────────────╮
+
+    🌙 moon lovers
+    💜 dreamers
+    ✨ lucky girls
+    🦋 future selves
+    🌿 healing journeys
+    ☁️ soft evenings
+
+╰───────────── ⊹₊⟡⋆ ─────────────╯
+</pre>
 
 </div>
 
-- **Inter** font — clean, minimal, zero distractions
-- Glassmorphism cards with backdrop blur
-- Linear-inspired bento grid layout
-- Purple-indigo gradient overlays on the ritual card
-- Animated shooting stars on `CustomPainter`
-
-```
-(っ˘ω˘ς ) zzz...  ──►  open app  ──►  🌙 ritual begins  ──►  ✨ sealed
-```
+<p align="center">
+  <i>little rituals become beautiful lives</i> ☾
+</p>
 
 ---
-
-## ✦ 　 tech stack 　 ✦
 
 <div align="center">
 
-| layer     | tech                           |
-| --------- | ------------------------------ |
-| 📱 UI     | Flutter 3.x + Material 3       |
-| 🔐 Auth   | Firebase Auth (Google Sign-In) |
-| ☁️ Data   | Cloud Firestore                |
-| 🎵 Music  | Spotify Web API + OAuth        |
-| 🔔 Notifs | flutter_local_notifications    |
-| 🌙 Moon   | custom `MoonPhaseService`      |
-| 💾 Local  | SharedPreferences              |
-| 🔑 Config | flutter_dotenv                 |
+<h2>⋆｡ﾟ☁︎｡⋆｡ ﾟ☾ ﾟ｡⋆</h2>
+<h3>✦ the nightly ritual ✦</h3>
+<h2>⋆｡ﾟ☁︎｡⋆｡ ﾟ☾ ﾟ｡⋆</h2>
+
+</div>
+
+<br/>
+
+<div align="center">
+
+<img src ="https://i.imgur.com/7UKv7Bg.png"/>
+</div>
+
+<br/>
+
+<div align="center">
+
+| Step | Ritual        | Description                       | Energy    |
+| ---- | ------------- | --------------------------------- | --------- |
+| 🌬   | **Breathe**   | 4-7-8 breathing cycles            | calm      |
+| 🎧   | **Frequency** | manifestation audio & subliminals | alignment |
+| ✨   | **Cast**      | affirmations & intentions         | creation  |
+| 🕯   | **Seal**      | gratitude & reflection            | trust     |
 
 </div>
 
 ---
 
-## ✦ 　 getting started 　 `(づ｡◕‿‿◕｡)づ`
+<div align="center">
 
-**1. clone**
+<h2>˚₊‧꒰ა ☆ ໒꒱ ‧₊˚</h2>
+<h3>⋆𐙚₊˚⊹♡ magical little features ♡⊹˚₊𐙚⋆</h3>
+<h2>˚₊‧꒰ა ☆ ໒꒱ ‧₊˚</h2>
+
+</div>
+
+<br/>
+
+<h3>🌙 lunar companion</h3>
+
+<p>
+Track the real moon phase and illumination percentage every night, so your ritual always feels connected to the sky.
+</p>
+
+<div align="center">
+
+<pre>
+╭───────────── ⊹₊⟡⋆ ─────────────╮
+
+🌑 New Moon
+🌒 Waxing Crescent
+🌓 First Quarter
+🌔 Waxing Gibbous
+🌕 Full Moon
+🌖 Waning Gibbous
+🌗 Last Quarter
+🌘 Waning Crescent
+
+╰───────────── ⊹₊⟡⋆ ─────────────╯
+</pre>
+
+</div>
+
+<p align="center">
+  <i>because every ritual deserves moonlight</i> ( ˘͈ ᵕ ˘͈♡)
+</p>
+
+---
+
+<h3>🔥 ritual streaks</h3>
+
+<p>
+Track your consistency with soft little progress counters.
+</p>
+
+<div align="center">
+
+<pre>
+╭───────────── ⊹₊⟡⋆ ─────────────╮
+
+🔥 current streak
+✨ spells cast
+🌙 rituals completed
+💜 nights returned to yourself
+
+╰───────────── ⊹₊⟡⋆ ─────────────╯
+</pre>
+
+</div>
+
+<p align="center">
+  <i>do it for future you, she is already glowing</i> ✧
+</p>
+
+---
+
+<h3>💜 manifestation journal</h3>
+
+<p>
+Capture wishes, affirmations, synchronicities, reflections, gratitude notes, and tiny signs from the universe.
+</p>
+
+<div align="center">
+
+<pre>
+╭───────────── ⊹₊⟡⋆ ─────────────╮
+
+🌙 moon work
+💜 self concept
+✨ manifestation
+🦋 transformation
+🌸 beauty
+💰 abundance
+👑 confidence
+🌿 healing
+🔮 intuition
+🌊 detachment
+🙏 gratitude
+
+╰───────────── ⊹₊⟡⋆ ─────────────╯
+</pre>
+
+</div>
+
+---
+
+<h3>🎧 cosmic frequencies</h3>
+
+<p>
+Instead of a strict Spotify connection, Nightly Ritual gives users a dreamy audio library filled with manifestation and subliminal collections.
+</p>
+
+<div align="center">
+
+<pre>
+╭───────────── ⊹₊⟡⋆ ─────────────╮
+
+🌙 moon manifestation
+💜 self concept reset
+💰 abundance magnet
+🌸 glow up subliminal
+👑 divine feminine
+🌿 healing frequencies
+🦋 highest self
+🌊 detachment & flow
+😴 sleep manifestation
+✨ lucky girl syndrome
+☁️ soft piano affirmations
+🕯 guided visualization
+
+╰───────────── ⊹₊⟡⋆ ─────────────╯
+</pre>
+
+</div>
+
+<p align="center">
+  <i>put on your headphones and let the universe do the rest</i> 🎧✨
+</p>
+
+---
+
+<h3>✅ tiny habit garden</h3>
+
+<p>
+Create gentle habits that support your dream life without harsh productivity pressure.
+</p>
+
+<div align="center">
+
+<pre>
+╭───────────── ⊹₊⟡⋆ ─────────────╮
+
+🌙 evening
+🌅 morning
+💜 self-care
+🧘 mindfulness
+📖 learning
+🌿 wellness
+😴 sleep
+🥗 nourishment
+🕯 ritual
+
+╰───────────── ⊹₊⟡⋆ ─────────────╯
+</pre>
+
+</div>
+
+<p align="center">
+  <i>soft consistency is still consistency</i> ୨୧
+</p>
+
+---
+
+<h3>🌟 starry animated background</h3>
+
+<p>
+A dreamy animated night sky sits behind the ritual experience.
+</p>
+
+<div align="center">
+
+<pre>
+✦ 150 twinkling stars
+☄ occasional shooting stars
+🌙 moonlit atmosphere
+✨ magical animations
+☁ dreamy gradients
+💜 soft glows
+</pre>
+
+</div>
+
+<p align="center">
+  <i>atmosphere is everything</i> (っ˘ω˘ς )
+</p>
+
+---
+
+<div align="center">
+
+<h2>•─────────✦❀✦────────•</h2>
+<h3>☾ design language ☾</h3>
+<h2>•─────────✦❀✦────────•</h2>
+
+</div>
+
+<br/>
+
+<div align="center">
+
+<pre>
+╔══════════════════════════════════════════╗
+║                                          ║
+║  Void Black       #030303                ║
+║  Midnight Ink     #0A0A0A                ║
+║  Moon Violet      #A855F7                ║
+║  Dream Indigo     #7C3AED                ║
+║  Starlight Pink   #DBB4FF                ║
+║  Ritual Green     #22C55E                ║
+║                                          ║
+╚══════════════════════════════════════════╝
+</pre>
+
+</div>
+
+<div align="center">
+
+<pre>
+☾ linear-inspired layouts
+✦ glassmorphism cards
+☾ floating stars
+✦ dreamy gradients
+☾ cozy minimalism
+✦ moonlit aesthetics
+♡ soft violet glows
+୨୧ bento-style sections
+</pre>
+
+</div>
+
+---
+
+<div align="center">
+
+<h2>───── ⋆⋅☆⋅⋆ ─────</h2>
+<h3>✦ tech stack ✦</h3>
+<h2>───── ⋆⋅☆⋅⋆ ─────</h2>
+
+</div>
+
+<br/>
+
+<div align="center">
+
+| Layer               | Magic                                            |
+| ------------------- | ------------------------------------------------ |
+| 📱 Interface        | Flutter 3.x + Material 3                         |
+| ☁️ Dream Archive    | Cloud Firestore                                  |
+| 🔐 Identity         | Firebase Auth                                    |
+| 🌙 Lunar Magic      | Real Moon Phase Calculations                     |
+| 🎧 Ritual Library   | Manifestation Playlists & Subliminal Collections |
+| 🔔 Gentle Reminders | Local Notifications                              |
+| ✨ Memory Crystals  | SharedPreferences                                |
+| 🔮 Secret Keys      | flutter_dotenv                                   |
+
+</div>
+
+---
+
+<div align="center">
+
+<h2>₊˚⊹♡ getting started ♡⊹˚₊</h2>
+
+</div>
+
+<br/>
+
+<h3>1. clone the repository</h3>
 
 ```bash
 git clone <your-repo-url>
 cd nightly_ritual
 ```
 
-**2. create your `.env`** at the project root:
+<h3>2. create your .env file</h3>
 
 ```env
 # Firebase
@@ -209,28 +408,38 @@ FIREBASE_PROJECT_ID=
 FIREBASE_STORAGE_BUCKET=
 FIREBASE_AUTH_DOMAIN=
 
-# Spotify
-SPOTIFY_CLIENT_ID=
-SPOTIFY_CLIENT_SECRET=
-SPOTIFY_REDIRECT_URI=
+# Ritual Audio / Playlist Links
+YOUTUBE_PLAYLIST_URL=
+SPOTIFY_PLAYLIST_URL=
 ```
 
-**3. install & run**
+<h3>3. install dependencies</h3>
 
 ```bash
 flutter pub get
+```
+
+<h3>4. run the app</h3>
+
+```bash
 flutter run
 ```
 
 ---
 
-## ✦ 　 project structure 　 🌿
+<div align="center">
 
-```
+<h2>˚₊‧꒰ა ☆ ໒꒱ ‧₊˚</h2>
+<h3>୨୧ project structure ୨୧</h3>
+<h2>˚₊‧꒰ა ☆ ໒꒱ ‧₊˚</h2>
+
+</div>
+
+```bash
 nightly_ritual/
 │
 ├── lib/
-│   ├── main.dart                    ← app root, ritual flow, home UI
+│   ├── main.dart
 │   │
 │   ├── models/
 │   │   ├── manifestation_ritual.dart
@@ -238,23 +447,22 @@ nightly_ritual/
 │   │   └── playlist_entry.dart
 │   │
 │   ├── pages/
-│   │   ├── rituals_page.dart        ← manifestation journal
-│   │   ├── habits_page.dart         ← daily habit tracker
-│   │   └── profile_page.dart        ← user profile
+│   │   ├── rituals_page.dart
+│   │   ├── habits_page.dart
+│   │   └── profile_page.dart
 │   │
 │   ├── services/
 │   │   ├── auth_service.dart
 │   │   ├── firestore_service.dart
-│   │   ├── spotify_service.dart
 │   │   ├── notification_service.dart
-│   │   ├── moon_phase_service.dart  ← real lunar calculations
+│   │   ├── moon_phase_service.dart
 │   │   └── ritual_storage_service.dart
 │   │
 │   └── widgets/
 │       └── moon_phase_icon.dart
 │
 ├── android/
-├── .env                             ← your secrets (gitignored!)
+├── .env
 └── pubspec.yaml
 ```
 
@@ -262,31 +470,100 @@ nightly_ritual/
 
 <div align="center">
 
-## ✦ 　 ‧₊˚ 🌙 ⋅ made with love ⋅ 🌙 ˚₊‧ 　 ✦
+<h2>┌─･｡ﾟ: ∘◦☾◦∘｡ﾟ. ─┐</h2>
+<h3>tiny preview of the vibe</h3>
+<h2>└─･｡ﾟ: ∘◦☾◦∘｡ﾟ. ─┘</h2>
 
 <br/>
 
-```
-　　　　　　 ˚　·　　·　　˚　　·　　·
-　　　　 ✦ · · ·　✦　· ·　✦　· · ✦
-　　　 ·  · ˚ ·　　　　　　　　· ˚ · ·
-　　✦　˚　　　∧＿∧ 　　　˚　　✦
-　　·　　　 ( ˘ω˘ ) 　　·　　·
-　　˚　·　 (  づ🌙)　　 ˚　·
-　　·  ✦　 し―J 　✦　·　 ˚
-　　　 ˚　·　·　✦　·　·　˚
-```
-
-_your ritual awaits ✨_
-
-_(｡･∀･)ﾉﾞ go seal something beautiful tonight_
+<pre>
+╭──────────────────────────────╮
+│                              │
+│        🌙 tonight's moon      │
+│                              │
+│        waxing crescent        │
+│        illumination 34%       │
+│                              │
+│   breathe • align • seal      │
+│                              │
+╰──────────────────────────────╯
+</pre>
 
 <br/>
 
-![made with flutter](https://img.shields.io/badge/made%20with-Flutter-A855F7?style=flat-square&logo=flutter&logoColor=white&labelColor=0A0A0A)
-![powered by love](https://img.shields.io/badge/powered%20by-💜%20love-A855F7?style=flat-square&labelColor=0A0A0A)
-![moon energy](https://img.shields.io/badge/moon%20energy-100%25-7C3AED?style=flat-square&labelColor=0A0A0A)
+<pre>
+╭──────────────────────────────╮
+│                              │
+│     🎧 tonight's frequency    │
+│                              │
+│     lucky girl syndrome       │
+│     self concept reset        │
+│     healing frequencies       │
+│                              │
+╰──────────────────────────────╯
+</pre>
+
+</div>
+
+---
+
+<div align="center">
+
+<h2>✧･ﾟ: *✧･ﾟ:* made under moonlight *:･ﾟ✧*:･ﾟ✧</h2>
 
 <br/>
+
+<pre>
+⠀.　　　　　　　　　　⠀⠀⠀✦ ⠀ ⠀　　　　　　　　　　　　　　⠀⠀⠀⠀⠀* ⠀⠀⠀.　　　　　　　　　　. ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀✦⠀⠀⠀ ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ ⠀ ⠀⠀⠀⠀⠀⠀.　　　　　　　　　　　　　.　　　ﾟ .　　　　　　　　　　　　　. 　　　　　　　　　　　　　　　✦ 　　　　　,　　　　　　　.⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀　　　　　　*　　　　　　　　　　　..　　　　　　　　　　　　　. 　　✦⠀　   　　　,　　　　　　　　　*　　　　　⠀　　　　⠀　　,⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀.　　　　　 　　⠀　　　⠀.　　　˚　　　⠀　⠀  　　,　　　　　　.　　　　　　　　　　　　　.　　　　　　*⠀　　⠀  　　　　　⠀✦⠀　　　　　　　*　　　　　　　　　　　　　　　　　　.　　　　.　　　　.　　　⠀　　　　　　　　　　　.　　　　　　　　　　˚　　　　　　　　ﾟ　　　　　.　.⠀　　⠀‍⠀‍⠀‍⠀‍⠀‍⠀‍⠀‍⠀‍⠀‍⠀‍⠀,　　　*　　⠀.　　　　　.　　　　　　　　　　⠀✦　˚　　　　　　　　　　　　　　.⠀ 　　　　　　　　　　.　　　　　　　　.　　　　　✦⠀　   　　　,　　    　　　　　　　　.⠀⠀⠀⠀⠀⠀.　　　　　　　　　　⠀⠀⠀✦ ⠀ ⠀　　　　　　　　　　　　　　⠀⠀⠀⠀⠀ ⠀⠀⠀.　　　　　　　　　　. ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀✦⠀⠀⠀ ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ ⠀ ⠀⠀⠀⠀⠀⠀.　　　　　　　　　　　　　.　　　ﾟ .　　　　　　　　　　　　　. 　　　　　　　　　　　　　　　✦ 　　　　　,　　　　　　　.⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀　　　　　　*　　　　　　　　　　　..　　　　　　　　　　　　　. 　　✦⠀　   　　　,　　　　　　　　　*　　　　　⠀　　　　⠀　　,⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀.　　　　　 　　⠀　　　⠀.　　　˚　　　⠀　⠀  　　,　　　　　　.　　　　　　　　　　　　　.　　　　　　*⠀　　⠀  　　　　　⠀✦⠀　　　　　　　*　　⠀⠀⠀.　　　　　　　　　　⠀⠀⠀✦ ⠀ ⠀　　　　　　　　　　　　　　⠀⠀⠀⠀⠀* ⠀⠀⠀.　　　　　　　　　　. ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀✦⠀⠀⠀ ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ ⠀ ⠀⠀⠀⠀⠀⠀.　　　　　　　　　　　　　.　　　ﾟ .　　　　　　　　　　　　　. 　　　　　　　　　　　　　　　✦ 　　　　　,　　　　　　　.
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+　　　　　　*　　　　　　　　　　　.
+.　　　　　　　　　　　　　. 　　✦⠀　   　　　,　　　　　　　　　*
+　　　　　⠀　　　　⠀　　,
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀.　　　　　 　　⠀　　　⠀.　
+ 　　˚　　　⠀　⠀  　　,　　　　　　.
+　　　　　　　　　　　　　.
+　　　　　　*⠀　　⠀  　　　　　⠀✦⠀　
+　　　　　　*　　　　　　　　　　　　　　　　　　.
+　　　　.　　　　.　　　⠀
+　　　　　　　　　　　.
+　　　　　　　
+　　　˚　　　　　　　　ﾟ　　　　　.
+　.⠀　　⠀‍⠀‍⠀‍⠀‍⠀‍⠀‍⠀‍⠀‍⠀‍⠀‍⠀,
+　　　*　　⠀.
+　　　　　.　　　　　　　　　　⠀✦
+　˚　　　　　　　　　　　　　　*
+.⠀ 　　　　　　　　　　.　　　　　　　　.
+　　　　　✦⠀　   　　　,　　    　　　　　　　　.
+⠀⠀⠀⠀⠀⠀.　　　　　　　　　　⠀⠀⠀✦ ⠀ ⠀　　　　　　　　　　　　　　⠀⠀⠀⠀⠀* ⠀⠀⠀.　　　　　　　　　　. ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀✦⠀⠀⠀ ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ ⠀ ⠀⠀⠀⠀⠀⠀.　　　　　　　　　　　　　.　　　ﾟ .　　　　　　　　　　　　　. 　　　　　　　　　　　　　　　✦ 　　　　　,　　　　　　　.
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+　　　　　　*　　　　　　　　　　　.
+.　　　　　　　　　　　　　. 　　✦⠀　   　　　,　　　　　　　　　*
+　　　　　⠀　　　　⠀　　,
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀.　　　　　 　　⠀　　　⠀　　　　　　　　　　　　　　　　.　　　　.　　　　.　　　　　　　　　　　　　　.
+　dream softly
+　love deeply
+　trust completely
+
+　　　　☾⋆⁺₊✧
+</pre>
+
+<br/>
+
+<p>
+  <i>see you tomorrow, starlight</i> ✨
+</p>
+
+<p>
+  (｡･ω･｡)ﾉ♡
+</p>
+
+<br/>
+
+<img src="https://img.shields.io/badge/made%20with-Flutter-C084FC?style=flat-square&logo=flutter&logoColor=white&labelColor=12001F"/>
+<img src="https://img.shields.io/badge/powered%20by-%F0%9F%92%9C%20love-C084FC?style=flat-square&labelColor=12001F"/>
+<img src="https://img.shields.io/badge/moon%20energy-100%25-7C3AED?style=flat-square&labelColor=12001F"/>
+<img src="https://img.shields.io/badge/soft%20coded-under%20the%20stars-DBB4FF?style=flat-square&labelColor=12001F"/>
+
+<br/><br/>
 
 </div>
