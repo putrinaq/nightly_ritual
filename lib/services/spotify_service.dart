@@ -18,7 +18,7 @@ class SpotifyService {
   static const String clientSecret = '3ef1f171627e4c03b3e26c8e39e27155';
 
   // The secure redirect URI we discussed (requires Dashboard update eventually)
-  static const String redirectUri = 'https://putrinaqibah.com/callback';
+  static const String redirectUri = 'ritual://callback';
   static const String redirectScheme = 'ritual';
 
   // YOUR SPECIFIC PLAYLIST

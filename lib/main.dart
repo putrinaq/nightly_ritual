@@ -1,24 +1,62 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'models/manifestation_ritual.dart';
+import 'models/playlist_entry.dart';
+import 'services/auth_service.dart';
+import 'services/firestore_service.dart';
 import 'services/ritual_storage_service.dart';
 import 'services/spotify_service.dart';
 import 'services/moon_phase_service.dart';
 import 'services/notification_service.dart';
 import 'widgets/moon_phase_icon.dart';
+import 'pages/rituals_page.dart';
+import 'pages/habits_page.dart';
+import 'pages/profile_page.dart';
+
+String _platformAppId() {
+  if (kIsWeb) return dotenv.env['FIREBASE_APP_ID_WEB'] ?? '';
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.iOS:
+      return dotenv.env['FIREBASE_APP_ID_IOS'] ?? '';
+    default:
+      return dotenv.env['FIREBASE_APP_ID_ANDROID'] ?? '';
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
     systemNavigationBarColor: Color(0xFF030303),
     systemNavigationBarIconBrightness: Brightness.light,
   ));
+
+  // Load .env and initialize Firebase (graceful on web where file isn't served)
+  await dotenv.load(fileName: '.env', mergeWith: {}).catchError((_) {});
+  await Firebase.initializeApp(
+    options: FirebaseOptions(
+      apiKey: dotenv.env['FIREBASE_API_KEY'] ?? '',
+      appId: _platformAppId(),
+      messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '',
+      projectId: dotenv.env['FIREBASE_PROJECT_ID'] ?? '',
+      storageBucket: dotenv.env['FIREBASE_STORAGE_BUCKET'],
+      authDomain: dotenv.env['FIREBASE_AUTH_DOMAIN'],
+    ),
+  );
+  AuthService().init();
 
   // Initialize storage service
   final storageService = RitualStorageService();
@@ -36,7 +74,7 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final reminderPrefs = ReminderPreferences(prefs);
 
-  // Reschedule reminder if it was enabled (clears on device reboot or app update)
+  // Reschedule reminder if it was enabled
   if (reminderPrefs.isEnabled) {
     await notificationService.scheduleReminderAt(
         reminderPrefs.hour, reminderPrefs.minute);
@@ -72,8 +110,8 @@ class NightlyRitualApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF030303),
-        primaryColor: const Color(0xFFA855F7), // Purple 500
-        fontFamily: 'Inter', // Assumes system sans-serif if not available
+        primaryColor: const Color(0xFFA855F7),
+        fontFamily: 'Inter',
         useMaterial3: true,
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFFA855F7),
@@ -110,8 +148,8 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  bool isAuthenticated = false;
   bool isRitualInProgress = false;
+  int _currentTab = 0;
   late int streakDays;
   late int totalRituals;
   late bool todayRitualCompleted;
@@ -130,58 +168,118 @@ class _MainScreenState extends State<MainScreen> {
     moonPhase = MoonPhaseService.getCurrentMoonPhase();
   }
 
-  void _handleLogin() {
-    Future.delayed(const Duration(milliseconds: 600), () {
-      setState(() => isAuthenticated = true);
-    });
-  }
-
   Future<void> _handleRitualComplete() async {
     await widget.storageService.completeRitual();
     setState(() {
       isRitualInProgress = false;
-      _loadData(); // Reload all data
+      _loadData();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF030303),
-      body: Stack(
-        children: [
-          // Background Layer
-          const Positioned.fill(child: StarryBackground()),
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        final user = snapshot.data;
+        final authLoading =
+            snapshot.connectionState == ConnectionState.waiting;
 
-          // Content Layer
-          SafeArea(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 600),
-              switchInCurve: Curves.easeOut,
-              switchOutCurve: Curves.easeIn,
-              child: !isAuthenticated
-                  ? LoginPage(onLogin: _handleLogin)
-                  : isRitualInProgress
-                      ? RitualFlow(
-                          onComplete: _handleRitualComplete,
-                          onExit: () =>
-                              setState(() => isRitualInProgress = false),
-                          spotifyService: widget.spotifyService,
-                          storageService: widget.storageService,
-                        )
-                      : HomePage(
-                          streakDays: streakDays,
-                          totalRituals: totalRituals,
-                          todayRitualCompleted: todayRitualCompleted,
-                          moonPhase: moonPhase,
-                          spotifyService: widget.spotifyService,
-                          notificationService: widget.notificationService,
-                          reminderPrefs: widget.reminderPrefs,
-                          storageService: widget.storageService,
-                          onBegin: () =>
-                              setState(() => isRitualInProgress = true),
+        return Scaffold(
+          backgroundColor: const Color(0xFF030303),
+          body: Stack(
+            children: [
+              const Positioned.fill(child: StarryBackground()),
+              SafeArea(
+                child: authLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFFA855F7),
+                          strokeWidth: 2,
                         ),
-            ),
+                      )
+                    : user == null
+                        ? const LoginPage()
+                        : isRitualInProgress
+                            ? RitualFlow(
+                                onComplete: _handleRitualComplete,
+                                onExit: () => setState(
+                                    () => isRitualInProgress = false),
+                                uid: user.uid,
+                              )
+                            : _buildTabs(user),
+              ),
+            ],
+          ),
+          bottomNavigationBar: user != null && !isRitualInProgress
+              ? _buildBottomNav()
+              : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildTabs(User user) {
+    return IndexedStack(
+      index: _currentTab,
+      children: [
+        HomePage(
+          streakDays: streakDays,
+          totalRituals: totalRituals,
+          todayRitualCompleted: todayRitualCompleted,
+          moonPhase: moonPhase,
+          spotifyService: widget.spotifyService,
+          notificationService: widget.notificationService,
+          reminderPrefs: widget.reminderPrefs,
+          storageService: widget.storageService,
+          user: user,
+          onBegin: () => setState(() => isRitualInProgress = true),
+        ),
+        RitualsPage(user: user),
+        HabitsPage(user: user),
+        ProfilePage(user: user, storageService: widget.storageService),
+      ],
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF080808),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.07)),
+        ),
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _currentTab,
+        onTap: (i) => setState(() => _currentTab = i),
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        selectedItemColor: const Color(0xFFA855F7),
+        unselectedItemColor: Colors.grey[700],
+        selectedFontSize: 10,
+        unselectedFontSize: 10,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.auto_awesome_outlined),
+            activeIcon: Icon(Icons.auto_awesome),
+            label: 'Rituals',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.check_circle_outline),
+            activeIcon: Icon(Icons.check_circle),
+            label: 'Habits',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
           ),
         ],
       ),
@@ -212,7 +310,7 @@ class _StarryBackgroundState extends State<StarryBackground>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 10), // Arbitrary long duration for loop
+      duration: const Duration(seconds: 10),
     )..repeat();
     _initStars();
   }
@@ -240,25 +338,21 @@ class _StarryBackgroundState extends State<StarryBackground>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        // Shooting star logic
         if (_random.nextDouble() < 0.01) {
           _shootingStars.add(_ShootingStar(
-            x: _random.nextDouble(), // 0.0 to 1.0 (screen width)
-            y: _random.nextDouble() * 0.3, // Top 30% of screen
+            x: _random.nextDouble(),
+            y: _random.nextDouble() * 0.3,
             angle: math.pi / 4 + (_random.nextDouble() * 0.1),
             speed: 0.01 + _random.nextDouble() * 0.01,
             length: 0.1 + _random.nextDouble() * 0.05,
           ));
         }
-
-        // Remove dead shooting stars
         _shootingStars.removeWhere((s) => s.life <= 0);
-
         return CustomPaint(
-          painter: StarryPainter(
+          painter: _StarryPainter(
             stars: _stars,
             shootingStars: _shootingStars,
-            time: _controller.value, // Just to trigger repaint
+            time: _controller.value,
           ),
           size: Size.infinite,
         );
@@ -288,12 +382,12 @@ class _ShootingStar {
       required this.length});
 }
 
-class StarryPainter extends CustomPainter {
+class _StarryPainter extends CustomPainter {
   final List<_Star> stars;
   final List<_ShootingStar> shootingStars;
   final double time;
 
-  StarryPainter(
+  _StarryPainter(
       {required this.stars, required this.shootingStars, required this.time});
 
   @override
@@ -301,7 +395,6 @@ class StarryPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    // 1. Gradients
     final Paint bgPaint = Paint()..color = const Color(0xFF030303);
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h), bgPaint);
 
@@ -327,25 +420,20 @@ class StarryPainter extends CustomPainter {
       ).createShader(Rect.fromLTWH(0, 0, w, h));
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h), blueGrad);
 
-    // 2. Stars
     for (var star in stars) {
       final double flicker = math.sin(
               DateTime.now().millisecondsSinceEpoch * 0.001 * star.speed * 5) *
           0.2;
       final double currentOpacity = (star.opacity + flicker).clamp(0.0, 1.0);
-
       final paint = Paint()
         ..color = Colors.white.withValues(alpha: currentOpacity);
       canvas.drawCircle(Offset(star.x * w, star.y * h), star.size, paint);
     }
 
-    // 3. Shooting Stars
     for (var s in shootingStars) {
       final startX = s.x * w;
       final startY = s.y * h;
-      // Calculate end point based on angle (roughly 45 deg)
-      final endX =
-          startX - (math.cos(s.angle) * s.length * w); // Trail goes back
+      final endX = startX - (math.cos(s.angle) * s.length * w);
       final endY = startY - (math.sin(s.angle) * s.length * h);
 
       final paint = Paint()
@@ -359,8 +447,6 @@ class StarryPainter extends CustomPainter {
         ..style = PaintingStyle.stroke;
 
       canvas.drawLine(Offset(startX, startY), Offset(endX, endY), paint);
-
-      // Update position
       s.x += math.cos(s.angle) * s.speed;
       s.y += math.sin(s.angle) * s.speed;
       s.life -= 0.02;
@@ -368,16 +454,32 @@ class StarryPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant StarryPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _StarryPainter oldDelegate) => true;
 }
 
 // -----------------------------------------------------------------------------
 // COMPONENTS: Pages
 // -----------------------------------------------------------------------------
 
-class LoginPage extends StatelessWidget {
-  final VoidCallback onLogin;
-  const LoginPage({super.key, required this.onLogin});
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  bool _loading = false;
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _loading = true);
+    try {
+      await AuthService().signInWithGoogle();
+      // Auth state stream in MainScreen handles the navigation
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -385,25 +487,22 @@ class LoginPage extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Transform.rotate(
-            angle: 0.00, // Slight tilt
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: const Color(0xFF0A0A0A),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    blurRadius: 30,
-                    offset: const Offset(0, 10),
-                  )
-                ],
-              ),
-              child: const Icon(Icons.bolt, color: Colors.white, size: 32),
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: const Color(0xFF0A0A0A),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                )
+              ],
             ),
+            child: const Icon(Icons.bolt, color: Colors.white, size: 32),
           ),
           const SizedBox(height: 48),
           const Text(
@@ -421,29 +520,56 @@ class LoginPage extends StatelessWidget {
           ),
           const SizedBox(height: 48),
           CupertinoButton(
-            onPressed: onLogin,
+            onPressed: _loading ? null : _signInWithGoogle,
             padding: EdgeInsets.zero,
             child: Container(
               width: 280,
-              height: 48,
+              height: 52,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Text(
-                    'Connect Account',
-                    style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14),
-                  ),
-                  SizedBox(width: 8),
-                  Icon(Icons.arrow_forward, color: Colors.black, size: 16),
-                ],
-              ),
+              child: _loading
+                  ? const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.black,
+                        ),
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Google 'G' icon using letters
+                        Container(
+                          width: 20,
+                          height: 20,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Text(
+                            'G',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Color(0xFF4285F4),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Continue with Google',
+                          style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14),
+                        ),
+                      ],
+                    ),
             ),
           ),
         ],
@@ -461,6 +587,7 @@ class HomePage extends StatefulWidget {
   final NotificationService notificationService;
   final ReminderPreferences reminderPrefs;
   final RitualStorageService storageService;
+  final User user;
   final VoidCallback onBegin;
 
   const HomePage({
@@ -473,6 +600,7 @@ class HomePage extends StatefulWidget {
     required this.notificationService,
     required this.reminderPrefs,
     required this.storageService,
+    required this.user,
     required this.onBegin,
   });
 
@@ -493,9 +621,19 @@ class _HomePageState extends State<HomePage> {
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    final name = widget.user.displayName?.split(' ').first ?? '';
+    final prefix =
+        hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+    return name.isNotEmpty ? '$prefix, $name' : prefix;
+  }
+
+  void _showPlaylistSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PlaylistListSheet(uid: widget.user.uid),
+    );
   }
 
   @override
@@ -544,7 +682,7 @@ class _HomePageState extends State<HomePage> {
                   height: 8,
                   decoration: BoxDecoration(
                     color: widget.spotifyService.isConnected
-                        ? const Color(0xFF1DB954) // Spotify green
+                        ? const Color(0xFF1DB954)
                         : Colors.redAccent,
                     shape: BoxShape.circle,
                     boxShadow: [
@@ -560,14 +698,14 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 16),
           Text(
             _getGreeting(),
             style: const TextStyle(
-                fontSize: 32, fontWeight: FontWeight.w300, color: Colors.white),
+                fontSize: 28, fontWeight: FontWeight.w300, color: Colors.white),
           ),
-          const SizedBox(height: 32),
-          // Bento Grid with dynamic data
+          const SizedBox(height: 16),
+          // Bento Grid
           Row(
             children: [
               Expanded(
@@ -588,9 +726,9 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           const SizedBox(height: 12),
-          // Spotify Playlist Card
+          // Playlist Card
           GestureDetector(
-            onTap: () => widget.spotifyService.openSpotifyPlaylist(),
+            onTap: () => _showPlaylistSheet(context),
             child: Container(
               height: 64,
               width: double.infinity,
@@ -606,14 +744,11 @@ class _HomePageState extends State<HomePage> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1DB954).withValues(alpha: 0.2),
+                      color: const Color(0xFFA855F7).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(
-                      Icons.music_note,
-                      color: Color(0xFF1DB954),
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.queue_music,
+                        color: Color(0xFFA855F7), size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -621,29 +756,18 @@ class _HomePageState extends State<HomePage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Ritual Playlist',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Text(
-                          'Open in Spotify',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
-                        ),
+                        const Text('Ritual Playlist',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500)),
+                        Text('Tap to browse playlists',
+                            style: TextStyle(
+                                color: Colors.grey[600], fontSize: 12)),
                       ],
                     ),
                   ),
-                  Icon(
-                    Icons.open_in_new,
-                    color: Colors.grey[600],
-                    size: 18,
-                  ),
+                  Icon(Icons.chevron_right, color: Colors.grey[600], size: 20),
                 ],
               ),
             ),
@@ -670,11 +794,8 @@ class _HomePageState extends State<HomePage> {
                       color: const Color(0xFFA855F7).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(
-                      Icons.notifications_outlined,
-                      color: Color(0xFFA855F7),
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.notifications_outlined,
+                        color: Color(0xFFA855F7), size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -682,22 +803,17 @@ class _HomePageState extends State<HomePage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Daily Reminder',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        const Text('Daily Reminder',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500)),
                         Text(
                           _reminderEnabled
                               ? 'Set for ${widget.reminderPrefs.timeFormatted}'
                               : 'Tap to set a reminder',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
+                          style:
+                              TextStyle(color: Colors.grey[600], fontSize: 12),
                         ),
                       ],
                     ),
@@ -717,219 +833,148 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(height: 12),
-          const SizedBox(height: 12),
-          // Affirmations card
-          GestureDetector(
-            onTap: () => _showManageAffirmations(context),
-            child: Container(
-              height: 64,
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0A0A0A),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.format_quote_rounded,
-                      color: Color(0xFF6366F1),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Affirmations',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+          // Main Ritual Card
+          Expanded(
+            child: GestureDetector(
+              onTap: widget.onBegin,
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0A0A0A),
+                  borderRadius: BorderRadius.circular(24),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              const Color(0xFF312E81).withValues(alpha: 0.4),
+                              Colors.black,
+                              const Color(0xFF581C87).withValues(alpha: 0.4),
+                            ],
                           ),
-                        ),
-                        Text(
-                          () {
-                            final count = widget.storageService
-                                .getCustomAffirmations()
-                                .length;
-                            return count > 0
-                                ? '$count custom · tap to manage'
-                                : 'Tap to add your own';
-                          }(),
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.add,
-                    color: Colors.grey[600],
-                    size: 18,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Main Ritual Card - always tappable
-          GestureDetector(
-            onTap: widget.onBegin,
-            child: Container(
-              height: 200,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: const Color(0xFF0A0A0A),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Stack(
-                children: [
-                  // Gradient Background
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            const Color(0xFF312E81).withValues(alpha: 0.4),
-                            Colors.black,
-                            const Color(0xFF581C87).withValues(alpha: 0.4),
-                          ],
                         ),
                       ),
                     ),
-                  ),
-                  // Floating Moon
-                  Positioned(
-                    right: -30,
-                    top: -30,
-                    child: Transform.rotate(
-                      angle: 0.2,
-                      child: Icon(
-                        CupertinoIcons.moon,
-                        size: 180,
-                        color: Colors.white.withValues(alpha: 0.05),
+                    Positioned(
+                      right: -30,
+                      top: -30,
+                      child: Transform.rotate(
+                        angle: 0.2,
+                        child: Icon(
+                          CupertinoIcons.moon,
+                          size: 180,
+                          color: Colors.white.withValues(alpha: 0.05),
+                        ),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const _GlassIcon(icon: Icons.auto_awesome_outlined),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: widget.todayRitualCompleted
-                                    ? const Color(0xFF22C55E)
-                                        .withValues(alpha: 0.2)
-                                    : const Color(0xFFA855F7)
-                                        .withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                    color: widget.todayRitualCompleted
-                                        ? const Color(0xFF22C55E)
-                                            .withValues(alpha: 0.3)
-                                        : const Color(0xFFA855F7)
-                                            .withValues(alpha: 0.3)),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const _GlassIcon(
+                                  icon: Icons.auto_awesome_outlined),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: widget.todayRitualCompleted
+                                      ? const Color(0xFF22C55E)
+                                          .withValues(alpha: 0.2)
+                                      : const Color(0xFFA855F7)
+                                          .withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
                                       color: widget.todayRitualCompleted
                                           ? const Color(0xFF22C55E)
-                                          : const Color(0xFFD8B4FE),
-                                      shape: BoxShape.circle,
+                                              .withValues(alpha: 0.3)
+                                          : const Color(0xFFA855F7)
+                                              .withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: BoxDecoration(
+                                        color: widget.todayRitualCompleted
+                                            ? const Color(0xFF22C55E)
+                                            : const Color(0xFFD8B4FE),
+                                        shape: BoxShape.circle,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    widget.todayRitualCompleted
-                                        ? 'SEALED'
-                                        : 'READY',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: widget.todayRitualCompleted
-                                          ? const Color(0xFF22C55E)
-                                          : const Color(0xFFD8B4FE),
-                                      letterSpacing: 1,
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      widget.todayRitualCompleted
+                                          ? 'SEALED'
+                                          : 'READY',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: widget.todayRitualCompleted
+                                            ? const Color(0xFF22C55E)
+                                            : const Color(0xFFD8B4FE),
+                                        letterSpacing: 1,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
+                            ],
+                          ),
+                          const Spacer(),
+                          Text(
+                            widget.todayRitualCompleted
+                                ? 'Repeat Ritual'
+                                : 'Begin Nightly Ritual',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
                             ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Text(
-                          widget.todayRitualCompleted
-                              ? 'Repeat Ritual'
-                              : 'Begin Nightly Ritual',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          widget.todayRitualCompleted
-                              ? 'Tap to strengthen your manifestation'
-                              : MoonPhaseService.getRitualMeaning(
-                                  widget.moonPhase.phase),
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[400],
-                            height: 1.5,
+                          const SizedBox(height: 8),
+                          Text(
+                            widget.todayRitualCompleted
+                                ? 'Tap to strengthen your manifestation'
+                                : MoonPhaseService.getRitualMeaning(
+                                    widget.moonPhase.phase),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[400],
+                              height: 1.5,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
+          const SizedBox(height: 16),
         ],
       ),
     );
   }
 
   static const List<String> _affirmationCategories = [
-    'Obsession',
-    'Detachment',
-    'Glow Up',
-    'Road Opener',
-    'Custom',
+    'Obsession', 'Detachment', 'Glow Up', 'Road Opener', 'Custom',
   ];
 
-  void _showManageAffirmations(BuildContext context) {
+  void _showManageAffirmations_DELETED_START(BuildContext context) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -951,7 +996,6 @@ class _HomePageState extends State<HomePage> {
               ),
               child: Column(
                 children: [
-                  // Handle
                   Container(
                     margin: const EdgeInsets.only(top: 12),
                     width: 36,
@@ -977,24 +1021,19 @@ class _HomePageState extends State<HomePage> {
                                   .withValues(alpha: 0.3),
                             ),
                           ),
-                          child: const Icon(
-                            Icons.format_quote_rounded,
-                            color: Color(0xFF6366F1),
-                            size: 20,
-                          ),
+                          child: const Icon(Icons.format_quote_rounded,
+                              color: Color(0xFF6366F1), size: 20),
                         ),
                         const SizedBox(width: 14),
                         const Expanded(
                           child: Text(
                             'Affirmations',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white,
-                            ),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white),
                           ),
                         ),
-                        // Add button
                         GestureDetector(
                           onTap: () => _showAddAffirmationDialog(
                               context, setModalState),
@@ -1006,23 +1045,19 @@ class _HomePageState extends State<HomePage> {
                                   .withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: const Color(0xFF6366F1)
-                                    .withValues(alpha: 0.3),
-                              ),
+                                  color: const Color(0xFF6366F1)
+                                      .withValues(alpha: 0.3)),
                             ),
                             child: const Row(
                               children: [
                                 Icon(Icons.add,
                                     color: Color(0xFF6366F1), size: 14),
                                 SizedBox(width: 4),
-                                Text(
-                                  'Add',
-                                  style: TextStyle(
-                                    color: Color(0xFF6366F1),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
+                                Text('Add',
+                                    style: TextStyle(
+                                        color: Color(0xFF6366F1),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500)),
                               ],
                             ),
                           ),
@@ -1036,35 +1071,25 @@ class _HomePageState extends State<HomePage> {
                       controller: scrollController,
                       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                       children: [
-                        // Built-in section
                         Text(
                           'BUILT-IN',
                           style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.2,
-                            color: Colors.grey[600],
-                          ),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.2,
+                              color: Colors.grey[600]),
                         ),
                         const SizedBox(height: 8),
-                        ..._AffirmationStepState._defaultAffirmations
-                            .map((a) => _affirmationTile(
-                                  text: a['text'] as String,
-                                  cat: a['cat'] as String,
-                                  canEdit: false,
-                                  onEdit: null,
-                                  onDelete: null,
-                                )),
+                        ...<Widget>[],
                         if (custom.isNotEmpty) ...[
                           const SizedBox(height: 20),
                           Text(
                             'CUSTOM',
                             style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.2,
-                              color: Colors.grey[600],
-                            ),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1.2,
+                                color: Colors.grey[600]),
                           ),
                           const SizedBox(height: 8),
                           ...custom.asMap().entries.map((entry) =>
@@ -1126,8 +1151,7 @@ class _HomePageState extends State<HomePage> {
         color: Colors.white.withValues(alpha: canEdit ? 0.05 : 0.02),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: Colors.white.withValues(alpha: canEdit ? 0.1 : 0.06),
-        ),
+            color: Colors.white.withValues(alpha: canEdit ? 0.1 : 0.06)),
       ),
       child: Row(
         children: [
@@ -1135,20 +1159,15 @@ class _HomePageState extends State<HomePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  text,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: canEdit ? Colors.white : Colors.grey[500],
-                    height: 1.4,
-                  ),
-                ),
+                Text(text,
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: canEdit ? Colors.white : Colors.grey[500],
+                        height: 1.4)),
                 const SizedBox(height: 4),
-                Text(
-                  cat,
-                  style: const TextStyle(
-                      fontSize: 11, color: Color(0xFF6366F1)),
-                ),
+                Text(cat,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF6366F1))),
               ],
             ),
           ),
@@ -1189,18 +1208,15 @@ class _HomePageState extends State<HomePage> {
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
           ),
-          title: const Text(
-            'New Affirmation',
-            style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500),
-          ),
+          title: const Text('New Affirmation',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Affirmation text
               TextField(
                 controller: textController,
                 style: const TextStyle(color: Colors.white, fontSize: 14),
@@ -1228,18 +1244,13 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Type / category label
-              Text(
-                'TYPE',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.2,
-                  color: Colors.grey[600],
-                ),
-              ),
+              Text('TYPE',
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.2,
+                      color: Colors.grey[600])),
               const SizedBox(height: 8),
-              // Free-text type field
               TextField(
                 controller: typeController,
                 style: const TextStyle(color: Colors.white, fontSize: 14),
@@ -1267,7 +1278,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 10),
-              // Quick-select preset chips
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -1276,8 +1286,7 @@ class _HomePageState extends State<HomePage> {
                     onTap: () {
                       typeController.text = cat;
                       typeController.selection = TextSelection.fromPosition(
-                        TextPosition(offset: cat.length),
-                      );
+                          TextPosition(offset: cat.length));
                       setDialogState(() {});
                     },
                     child: Container(
@@ -1287,14 +1296,11 @@ class _HomePageState extends State<HomePage> {
                         color: Colors.white.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.1),
-                        ),
+                            color: Colors.white.withValues(alpha: 0.1)),
                       ),
-                      child: Text(
-                        cat,
-                        style: TextStyle(
-                            fontSize: 11, color: Colors.grey[400]),
-                      ),
+                      child: Text(cat,
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey[400])),
                     ),
                   );
                 }).toList(),
@@ -1352,13 +1358,11 @@ class _HomePageState extends State<HomePage> {
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
           ),
-          title: const Text(
-            'Edit Affirmation',
-            style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500),
-          ),
+          title: const Text('Edit Affirmation',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1390,15 +1394,12 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(
-                'TYPE',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.2,
-                  color: Colors.grey[600],
-                ),
-              ),
+              Text('TYPE',
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.2,
+                      color: Colors.grey[600])),
               const SizedBox(height: 8),
               TextField(
                 controller: typeController,
@@ -1435,8 +1436,7 @@ class _HomePageState extends State<HomePage> {
                     onTap: () {
                       typeController.text = cat;
                       typeController.selection = TextSelection.fromPosition(
-                        TextPosition(offset: cat.length),
-                      );
+                          TextPosition(offset: cat.length));
                       setDialogState(() {});
                     },
                     child: Container(
@@ -1448,11 +1448,9 @@ class _HomePageState extends State<HomePage> {
                         border: Border.all(
                             color: Colors.white.withValues(alpha: 0.1)),
                       ),
-                      child: Text(
-                        cat,
-                        style: TextStyle(
-                            fontSize: 11, color: Colors.grey[400]),
-                      ),
+                      child: Text(cat,
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey[400])),
                     ),
                   );
                 }).toList(),
@@ -1517,10 +1515,9 @@ class _HomePageState extends State<HomePage> {
                   ? 'Spotify Connected'
                   : 'Connect to Spotify',
               style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
-              ),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white),
             ),
             const SizedBox(height: 24),
             if (!widget.spotifyService.isConnected)
@@ -1533,13 +1530,9 @@ class _HomePageState extends State<HomePage> {
                     Navigator.pop(context);
                     await widget.spotifyService.authenticate();
                   },
-                  child: const Text(
-                    'Connect Spotify',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: const Text('Connect Spotify',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.w600)),
                 ),
               )
             else
@@ -1554,13 +1547,10 @@ class _HomePageState extends State<HomePage> {
                         Navigator.pop(context);
                         widget.spotifyService.openSpotifyPlaylist();
                       },
-                      child: const Text(
-                        'Open Playlist',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child: const Text('Open Playlist',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600)),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1571,15 +1561,12 @@ class _HomePageState extends State<HomePage> {
                       borderRadius: BorderRadius.circular(12),
                       onPressed: () async {
                         await widget.spotifyService.disconnect();
-                        Navigator.pop(context);
+                        if (context.mounted) Navigator.pop(context);
                       },
-                      child: const Text(
-                        'Disconnect',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child: const Text('Disconnect',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600)),
                     ),
                   ),
                 ],
@@ -1591,21 +1578,19 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // --- ALTERNATIVE LINEAR STYLE PICKER METHOD ---
   void _showLinearTimePicker(BuildContext context, StateSetter setModalState) {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0A0A0A),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        side: BorderSide(color: Colors.white12), // Linear Border
+        side: BorderSide(color: Colors.white12),
       ),
       builder: (context) => Container(
         height: 320,
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
         child: Column(
           children: [
-            // Custom Handle
             Container(
               width: 40,
               height: 4,
@@ -1620,13 +1605,14 @@ class _HomePageState extends State<HomePage> {
                   brightness: Brightness.dark,
                   textTheme: CupertinoTextThemeData(
                     dateTimePickerTextStyle: TextStyle(
-                        color: Colors.white, fontSize: 22, fontFamily: 'Inter'),
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontFamily: 'Inter'),
                   ),
                 ),
                 child: CupertinoDatePicker(
                   mode: CupertinoDatePickerMode.time,
                   backgroundColor: Colors.transparent,
-                  // Combine Today's date with existing time to make a valid DateTime object
                   initialDateTime: DateTime(
                     DateTime.now().year,
                     DateTime.now().month,
@@ -1636,7 +1622,6 @@ class _HomePageState extends State<HomePage> {
                   ),
                   onDateTimeChanged: (DateTime newTime) {
                     final newTimeOfDay = TimeOfDay.fromDateTime(newTime);
-                    // Update both the modal state (so text updates) and parent state
                     setModalState(() => _reminderTime = newTimeOfDay);
                     setState(() => _reminderTime = newTimeOfDay);
                   },
@@ -1644,17 +1629,14 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(height: 10),
-            // Confirm Button
             SizedBox(
               width: double.infinity,
               child: CupertinoButton(
                 color: const Color(0xFFA855F7),
                 borderRadius: BorderRadius.circular(12),
-                child: const Text(
-                  "Set Time",
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600),
-                ),
+                child: const Text('Set Time',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w600)),
                 onPressed: () => Navigator.pop(context),
               ),
             )
@@ -1673,13 +1655,13 @@ class _HomePageState extends State<HomePage> {
         builder: (context, setModalState) => Container(
           decoration: BoxDecoration(
             color: const Color(0xFF0A0A0A),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
             border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Handle bar
               Container(
                 margin: const EdgeInsets.only(top: 12),
                 width: 36,
@@ -1694,57 +1676,43 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header row with icon and title
                     Row(
                       children: [
                         Container(
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color:
-                                const Color(0xFFA855F7).withValues(alpha: 0.15),
+                            color: const Color(0xFFA855F7)
+                                .withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: const Color(0xFFA855F7)
-                                  .withValues(alpha: 0.3),
-                            ),
+                                color: const Color(0xFFA855F7)
+                                    .withValues(alpha: 0.3)),
                           ),
-                          child: const Icon(
-                            Icons.notifications_outlined,
-                            color: Color(0xFFA855F7),
-                            size: 20,
-                          ),
+                          child: const Icon(Icons.notifications_outlined,
+                              color: Color(0xFFA855F7), size: 20),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Daily Reminder',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.white,
-                                ),
-                              ),
+                              const Text('Daily Reminder',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white)),
                               const SizedBox(height: 2),
-                              Text(
-                                'Never miss your nightly ritual',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey[500],
-                                ),
-                              ),
+                              Text('Never miss your nightly ritual',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[500])),
                             ],
                           ),
                         ),
-                        // Status indicator
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
+                              horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: _reminderEnabled
                                 ? const Color(0xFF22C55E)
@@ -1773,58 +1741,43 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                     const SizedBox(height: 28),
-                    // Time selection card
                     GestureDetector(
-                      onTap: () {
-                        // --- UPDATED: TRIGGER NEW PICKER ---
-                        _showLinearTimePicker(context, setModalState);
-                      },
+                      onTap: () =>
+                          _showLinearTimePicker(context, setModalState),
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.03),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.08),
-                          ),
+                              color: Colors.white.withValues(alpha: 0.08)),
                         ),
                         child: Row(
                           children: [
-                            Icon(
-                              Icons.access_time_rounded,
-                              color: Colors.grey[500],
-                              size: 20,
-                            ),
+                            Icon(Icons.access_time_rounded,
+                                color: Colors.grey[500], size: 20),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                'Reminder Time',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[400],
-                                ),
-                              ),
+                              child: Text('Reminder Time',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[400])),
                             ),
                             Text(
                               _formatTime(_reminderTime),
                               style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.white,
-                              ),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white),
                             ),
                             const SizedBox(width: 8),
-                            Icon(
-                              Icons.chevron_right,
-                              color: Colors.grey[600],
-                              size: 20,
-                            ),
+                            Icon(Icons.chevron_right,
+                                color: Colors.grey[600], size: 20),
                           ],
                         ),
                       ),
                     ),
                     const SizedBox(height: 24),
-                    // Action button
                     GestureDetector(
                       onTap: () async {
                         if (_reminderEnabled) {
@@ -1844,18 +1797,18 @@ class _HomePageState extends State<HomePage> {
                             setState(() => _reminderEnabled = true);
                             if (context.mounted) {
                               Navigator.pop(context);
-                              widget.notificationService.showTestNotification();
+                              widget.notificationService
+                                  .showTestNotification();
                             }
                           } else {
-                            // Show error for unsupported platforms
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   backgroundColor: const Color(0xFF1A1A1A),
                                   behavior: SnackBarBehavior.floating,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
+                                      borderRadius:
+                                          BorderRadius.circular(8)),
                                   content: const Text(
                                     'Notifications not available on this platform',
                                     style: TextStyle(color: Colors.white),
@@ -1872,20 +1825,18 @@ class _HomePageState extends State<HomePage> {
                         decoration: BoxDecoration(
                           gradient: _reminderEnabled
                               ? null
-                              : const LinearGradient(
-                                  colors: [
-                                    Color(0xFFA855F7),
-                                    Color(0xFF7C3AED),
-                                  ],
-                                ),
+                              : const LinearGradient(colors: [
+                                  Color(0xFFA855F7),
+                                  Color(0xFF7C3AED)
+                                ]),
                           color: _reminderEnabled
                               ? Colors.white.withValues(alpha: 0.05)
                               : null,
                           borderRadius: BorderRadius.circular(10),
                           border: _reminderEnabled
                               ? Border.all(
-                                  color: Colors.white.withValues(alpha: 0.1),
-                                )
+                                  color:
+                                      Colors.white.withValues(alpha: 0.1))
                               : null,
                         ),
                         child: Center(
@@ -1905,10 +1856,9 @@ class _HomePageState extends State<HomePage> {
                                     ? 'Disable Reminder'
                                     : 'Enable Reminder',
                                 style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
-                                ),
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 14),
                               ),
                             ],
                           ),
@@ -1956,19 +1906,17 @@ class _BentoCard extends StatelessWidget {
         children: [
           Icon(icon, color: Colors.grey[600], size: 20),
           const SizedBox(height: 24),
-          Text(
-            value,
-            style: const TextStyle(
-                fontSize: 24, fontWeight: FontWeight.w500, color: Colors.white),
-          ),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white)),
           const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey[600]),
-          ),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[600])),
         ],
       ),
     );
@@ -2005,15 +1953,13 @@ class _GlassIcon extends StatelessWidget {
 class RitualFlow extends StatefulWidget {
   final Future<void> Function() onComplete;
   final VoidCallback onExit;
-  final SpotifyService spotifyService;
-  final RitualStorageService storageService;
+  final String uid;
 
   const RitualFlow({
     super.key,
     required this.onComplete,
     required this.onExit,
-    required this.spotifyService,
-    required this.storageService,
+    required this.uid,
   });
 
   @override
@@ -2045,7 +1991,6 @@ class _RitualFlowState extends State<RitualFlow> {
     return Column(
       children: [
         const SizedBox(height: 20),
-        // Header
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Row(
@@ -2080,12 +2025,11 @@ class _RitualFlowState extends State<RitualFlow> {
                   ),
                 ],
               ),
-              const SizedBox(width: 40), // Balance
+              const SizedBox(width: 40),
             ],
           ),
         ),
         const SizedBox(height: 20),
-        // Progress Bar
         SizedBox(
           height: 2,
           child: Stack(
@@ -2104,8 +2048,6 @@ class _RitualFlowState extends State<RitualFlow> {
             ],
           ),
         ),
-
-        // Content Area
         Expanded(
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 400),
@@ -2115,8 +2057,6 @@ class _RitualFlowState extends State<RitualFlow> {
             ),
           ),
         ),
-
-        // Footer Nav
         if (currentStep['type'] != 'affirmation')
           Padding(
             padding: const EdgeInsets.all(24),
@@ -2158,11 +2098,9 @@ class _RitualFlowState extends State<RitualFlow> {
       case 'breathing':
         return BreathingStep(onComplete: nextStep);
       case 'music':
-        return MusicStep(spotifyService: widget.spotifyService);
+        return MusicStep(uid: widget.uid);
       case 'affirmation':
-        return AffirmationStep(
-            onComplete: nextStep,
-            storageService: widget.storageService);
+        return AffirmationStep(onComplete: nextStep, uid: widget.uid);
       case 'reflection':
         return const ReflectionStep();
       default:
@@ -2201,7 +2139,7 @@ class _BreathingStepState extends State<BreathingStep>
 
   void _startCycle() {
     if (!mounted) return;
-    _controller.repeat(reverse: true); // Pulse effect base
+    _controller.repeat(reverse: true);
     _runPhase();
   }
 
@@ -2210,20 +2148,16 @@ class _BreathingStepState extends State<BreathingStep>
       widget.onComplete();
       return;
     }
-
-    // Inhale: 4s
     setState(() {
       phase = 'Inhale';
       count = 4;
     });
     _tick(4, () {
-      // Hold: 7s
       setState(() {
         phase = 'Hold';
         count = 7;
       });
       _tick(7, () {
-        // Exhale: 8s
         setState(() {
           phase = 'Exhale';
           count = 8;
@@ -2258,7 +2192,7 @@ class _BreathingStepState extends State<BreathingStep>
   @override
   Widget build(BuildContext context) {
     double scale = 1.0;
-    Color ringColor = const Color(0xFFA855F7); // Purple
+    Color ringColor = const Color(0xFFA855F7);
 
     if (phase == 'Inhale') {
       scale = 1.5;
@@ -2267,7 +2201,7 @@ class _BreathingStepState extends State<BreathingStep>
       ringColor = Colors.white;
     } else {
       scale = 1.0;
-      ringColor = const Color(0xFF6366F1); // Indigo
+      ringColor = const Color(0xFF6366F1);
     }
 
     return Center(
@@ -2280,35 +2214,32 @@ class _BreathingStepState extends State<BreathingStep>
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Outer Orbit
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 4000),
                   curve: Curves.easeInOut,
-                  width:
-                      280 * (phase == 'Inhale' || phase == 'Hold' ? 1.0 : 0.6),
-                  height:
-                      280 * (phase == 'Inhale' || phase == 'Hold' ? 1.0 : 0.6),
+                  width: 280 *
+                      (phase == 'Inhale' || phase == 'Hold' ? 1.0 : 0.6),
+                  height: 280 *
+                      (phase == 'Inhale' || phase == 'Hold' ? 1.0 : 0.6),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.05)),
                   ),
                 ),
-                // Inner Orbit
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 4000),
                   curve: Curves.easeInOut,
-                  width:
-                      200 * (phase == 'Inhale' || phase == 'Hold' ? 1.0 : 0.7),
-                  height:
-                      200 * (phase == 'Inhale' || phase == 'Hold' ? 1.0 : 0.7),
+                  width: 200 *
+                      (phase == 'Inhale' || phase == 'Hold' ? 1.0 : 0.7),
+                  height: 200 *
+                      (phase == 'Inhale' || phase == 'Hold' ? 1.0 : 0.7),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.1)),
                   ),
                 ),
-                // Core
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 4000),
                   curve: Curves.easeInOut,
@@ -2341,7 +2272,9 @@ class _BreathingStepState extends State<BreathingStep>
           const SizedBox(height: 48),
           Text(phase,
               style: const TextStyle(
-                  fontSize: 24, fontWeight: FontWeight.w300, letterSpacing: 1)),
+                  fontSize: 24,
+                  fontWeight: FontWeight.w300,
+                  letterSpacing: 1)),
           const SizedBox(height: 8),
           Text(
             'Cycle $cycle / 4',
@@ -2357,249 +2290,505 @@ class _BreathingStepState extends State<BreathingStep>
   }
 }
 
-class MusicStep extends StatefulWidget {
-  final SpotifyService spotifyService;
+class _PlaylistListSheet extends StatelessWidget {
+  final String uid;
+  const _PlaylistListSheet({required this.uid});
 
-  const MusicStep({super.key, required this.spotifyService});
+  void _showAdd(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AddPlaylistSheet(uid: uid),
+    );
+  }
 
   @override
-  State<MusicStep> createState() => _MusicStepState();
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D0D0D),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      child: Column(
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('My Playlists',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500)),
+              GestureDetector(
+                onTap: () => _showAdd(context),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFA855F7).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color:
+                            const Color(0xFFA855F7).withValues(alpha: 0.3)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.add, color: Color(0xFFD8B4FE), size: 14),
+                      SizedBox(width: 4),
+                      Text('Add',
+                          style: TextStyle(
+                              color: Color(0xFFD8B4FE), fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: StreamBuilder<List<PlaylistEntry>>(
+              stream: FirestoreService().getPlaylists(uid),
+              builder: (context, snapshot) {
+                final playlists = snapshot.data ?? [];
+                if (playlists.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.queue_music_outlined,
+                            color: Colors.grey[700], size: 48),
+                        const SizedBox(height: 12),
+                        const Text('No playlists yet',
+                            style: TextStyle(
+                                color: Colors.white, fontSize: 15)),
+                        const SizedBox(height: 6),
+                        Text('Add a Spotify or YouTube playlist',
+                            style: TextStyle(
+                                color: Colors.grey[600], fontSize: 12)),
+                      ],
+                    ),
+                  );
+                }
+                return ListView.separated(
+                  itemCount: playlists.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, i) => _PlaylistTile(
+                    playlist: playlists[i],
+                    onDelete: () => FirestoreService()
+                        .deletePlaylist(uid, playlists[i].id!),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _MusicStepState extends State<MusicStep> with TickerProviderStateMixin {
-  bool isPlaying = false;
-  bool isConnecting = false;
-  late AnimationController _visualizerController;
+class MusicStep extends StatelessWidget {
+  final String uid;
+  const MusicStep({super.key, required this.uid});
 
-  @override
-  void initState() {
-    super.initState();
-    _visualizerController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    )..repeat(reverse: true);
-
-    // Auto-play if connected
-    if (widget.spotifyService.isConnected) {
-      _startPlayback();
-    }
+  void _showAddSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AddPlaylistSheet(uid: uid),
+    );
   }
 
   @override
-  void dispose() {
-    _visualizerController.dispose();
-    // Pause when leaving this step
-    if (isPlaying) {
-      widget.spotifyService.pausePlayback();
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<PlaylistEntry>>(
+      stream: FirestoreService().getPlaylists(uid),
+      builder: (context, snapshot) {
+        final playlists = snapshot.data ?? [];
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'My Playlists',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500),
+                  ),
+                  GestureDetector(
+                    onTap: () => _showAddSheet(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFA855F7).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: const Color(0xFFA855F7)
+                                .withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.add,
+                              color: Color(0xFFD8B4FE), size: 14),
+                          SizedBox(width: 4),
+                          Text('Add',
+                              style: TextStyle(
+                                  color: Color(0xFFD8B4FE), fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (playlists.isEmpty)
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.queue_music_outlined,
+                            color: Colors.grey[700], size: 48),
+                        const SizedBox(height: 12),
+                        const Text('No playlists yet',
+                            style: TextStyle(
+                                color: Colors.white, fontSize: 15)),
+                        const SizedBox(height: 6),
+                        Text('Add a Spotify or YouTube playlist',
+                            style: TextStyle(
+                                color: Colors.grey[600], fontSize: 12)),
+                        const SizedBox(height: 24),
+                        GestureDetector(
+                          onTap: () => _showAddSheet(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFA855F7)
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                  color: const Color(0xFFA855F7)
+                                      .withValues(alpha: 0.3)),
+                            ),
+                            child: const Text('Add Playlist',
+                                style: TextStyle(
+                                    color: Color(0xFFD8B4FE),
+                                    fontSize: 14)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: playlists.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (_, i) => _PlaylistTile(
+                      playlist: playlists[i],
+                      onDelete: () => FirestoreService()
+                          .deletePlaylist(uid, playlists[i].id!),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PlaylistTile extends StatelessWidget {
+  final PlaylistEntry playlist;
+  final VoidCallback onDelete;
+
+  const _PlaylistTile({required this.playlist, required this.onDelete});
+
+  Color get _color {
+    switch (playlist.platform) {
+      case 'spotify':
+        return const Color(0xFF1DB954);
+      case 'youtube':
+        return const Color(0xFFFF4444);
+      default:
+        return const Color(0xFFA855F7);
     }
-    super.dispose();
   }
 
-  Future<void> _startPlayback() async {
-    setState(() => isConnecting = true);
-    final success = await widget.spotifyService.playPlaylist();
-    if (mounted) {
-      setState(() {
-        isPlaying = success;
-        isConnecting = false;
-      });
+  IconData get _icon {
+    switch (playlist.platform) {
+      case 'spotify':
+        return Icons.music_note;
+      case 'youtube':
+        return Icons.play_circle_fill;
+      default:
+        return Icons.queue_music;
     }
   }
 
-  Future<void> _togglePlayback() async {
-    if (!widget.spotifyService.isConnected) {
-      // Not connected, try to authenticate
-      setState(() => isConnecting = true);
-      final authenticated = await widget.spotifyService.authenticate();
-      if (authenticated && mounted) {
-        await _startPlayback();
-      } else if (mounted) {
-        setState(() => isConnecting = false);
-        // Open playlist in browser as fallback
-        widget.spotifyService.openSpotifyPlaylist();
-      }
-      return;
+  String get _label {
+    switch (playlist.platform) {
+      case 'spotify':
+        return 'SPOTIFY';
+      case 'youtube':
+        return 'YOUTUBE';
+      default:
+        return 'LINK';
     }
+  }
 
-    if (isPlaying) {
-      await widget.spotifyService.pausePlayback();
-      if (mounted) setState(() => isPlaying = false);
-    } else {
-      await widget.spotifyService.resumePlayback();
-      if (mounted) setState(() => isPlaying = true);
+  Future<void> _open() async {
+    final uri = Uri.tryParse(playlist.url);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 320,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0A0A0A),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(_icon, color: _color, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  playlist.name,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _label,
+                  style: TextStyle(
+                      color: _color,
+                      fontSize: 10,
+                      letterSpacing: 1,
+                      fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _open,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: _color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text('Open',
+                  style: TextStyle(
+                      color: _color,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onDelete,
+            child: Icon(Icons.close, size: 16, color: Colors.grey[600]),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddPlaylistSheet extends StatefulWidget {
+  final String uid;
+  const _AddPlaylistSheet({required this.uid});
+
+  @override
+  State<_AddPlaylistSheet> createState() => _AddPlaylistSheetState();
+}
+
+class _AddPlaylistSheetState extends State<_AddPlaylistSheet> {
+  final _nameCtrl = TextEditingController();
+  final _urlCtrl = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _urlCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _nameCtrl.text.trim();
+    final url = _urlCtrl.text.trim();
+    if (name.isEmpty || url.isEmpty) return;
+    setState(() => _saving = true);
+    try {
+      await FirestoreService().addPlaylist(
+        widget.uid,
+        PlaylistEntry(
+          name: name,
+          url: url,
+          platform: PlaylistEntry.detectPlatform(url),
+          createdAt: DateTime.now(),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1DB954).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: const Color(0xFF1DB954).withValues(alpha: 0.2)),
-                  ),
-                  child: const Icon(Icons.music_note,
-                      color: Color(0xFF1DB954), size: 24),
-                ),
-                // Animated audio visualizer bars
-                AnimatedBuilder(
-                  animation: _visualizerController,
-                  builder: (context, child) {
-                    return Row(
-                      children: List.generate(5, (index) {
-                        final baseHeight = 8.0 + (index % 3) * 6.0;
-                        final animatedHeight = isPlaying
-                            ? baseHeight +
-                                (math.sin(
-                                        _visualizerController.value * math.pi +
-                                            index * 0.5) *
-                                    8)
-                            : baseHeight;
-                        return Container(
-                          margin: const EdgeInsets.only(left: 3),
-                          width: 3,
-                          height: animatedHeight.abs(),
-                          decoration: BoxDecoration(
-                            color: isPlaying
-                                ? const Color(0xFF1DB954)
-                                : const Color(0xFFA855F7)
-                                    .withValues(alpha: 0.4),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        );
-                      }),
-                    );
-                  },
-                ),
-              ],
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Widget _label(String text) => Text(
+        text,
+        style: const TextStyle(
+            fontSize: 10,
+            letterSpacing: 1.5,
+            color: Color(0xFF888888),
+            fontWeight: FontWeight.w600),
+      );
+
+  Widget _field(
+          {required TextEditingController controller,
+          required String hint}) =>
+      TextField(
+        controller: controller,
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.04),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide:
+                BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide:
+                BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFA855F7)),
+          ),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D0D0D),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: BorderRadius.circular(2)),
             ),
-            const SizedBox(height: 32),
-            Row(
-              children: [
-                const Text('Ritual Playlist',
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white)),
-                const SizedBox(width: 8),
-                if (widget.spotifyService.isConnected)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1DB954).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'SPOTIFY',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1DB954),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              isPlaying
-                  ? 'Now playing...'
-                  : widget.spotifyService.isConnected
-                      ? 'Tap to play'
-                      : 'Connect to Spotify',
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-            ),
-            const SizedBox(height: 24),
-            // Spotify branding
-            GestureDetector(
-              onTap: () => widget.spotifyService.openSpotifyPlaylist(),
+          ),
+          const SizedBox(height: 20),
+          const Text('Add Playlist',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500)),
+          const SizedBox(height: 20),
+          _label('NAME'),
+          const SizedBox(height: 8),
+          _field(controller: _nameCtrl, hint: 'e.g. Night Ritual Mix'),
+          const SizedBox(height: 16),
+          _label('URL'),
+          const SizedBox(height: 8),
+          _field(
+              controller: _urlCtrl,
+              hint: 'Paste Spotify or YouTube link...'),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: CupertinoButton(
+              onPressed: _saving ? null : _save,
+              padding: EdgeInsets.zero,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(8),
-                  border:
-                      Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                  gradient: const LinearGradient(
+                      colors: [Color(0xFFA855F7), Color(0xFF7C3AED)]),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.open_in_new, size: 14, color: Colors.grey[500]),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Open in Spotify',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                    ),
-                  ],
+                child: Center(
+                  child: _saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : const Text('Save',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15)),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                GestureDetector(
-                  onTap: isConnecting ? null : _togglePlayback,
-                  child: Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: widget.spotifyService.isConnected
-                          ? const Color(0xFF1DB954)
-                          : Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: (widget.spotifyService.isConnected
-                                  ? const Color(0xFF1DB954)
-                                  : Colors.white)
-                              .withValues(alpha: 0.3),
-                          blurRadius: 20,
-                        ),
-                      ],
-                    ),
-                    child: isConnecting
-                        ? const Padding(
-                            padding: EdgeInsets.all(20),
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Icon(
-                            isPlaying ? Icons.pause : Icons.play_arrow,
-                            color: widget.spotifyService.isConnected
-                                ? Colors.white
-                                : Colors.black,
-                            size: 32,
-                          ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -2607,145 +2796,100 @@ class _MusicStepState extends State<MusicStep> with TickerProviderStateMixin {
 
 class AffirmationStep extends StatefulWidget {
   final VoidCallback onComplete;
-  final RitualStorageService storageService;
-  const AffirmationStep(
-      {super.key, required this.onComplete, required this.storageService});
+  final String uid;
+  const AffirmationStep({super.key, required this.onComplete, required this.uid});
 
   @override
   State<AffirmationStep> createState() => _AffirmationStepState();
 }
 
 class _AffirmationStepState extends State<AffirmationStep> {
-  static const List<Map<String, dynamic>> _defaultAffirmations = [
-    {
-      "text": "He feels the weight of his actions and is drawn to me.",
-      "cat": "Obsession",
-      "icon": Icons.lock
-    },
-    {
-      "text": "His awareness and desire for me grow stronger every day.",
-      "cat": "Obsession",
-      "icon": Icons.lock
-    },
-    {
-      "text": "I release all attachment and reclaim my inner freedom.",
-      "cat": "Detachment",
-      "icon": Icons.air
-    },
-    {
-      "text": "I am calm, centered, and emotionally empowered.",
-      "cat": "Detachment",
-      "icon": Icons.air
-    },
-    {
-      "text": "I radiate natural magnetism while honoring my boundaries.",
-      "cat": "Glow Up",
-      "icon": Icons.auto_awesome
-    },
-    {
-      "text": "My glow attracts abundance, opportunity, and success.",
-      "cat": "Glow Up",
-      "icon": Icons.auto_awesome
-    },
-    {
-      "text":
-          "My beauty, confidence, and energy open doors for me effortlessly.",
-      "cat": "Road Opener",
-      "icon": Icons.lock_open
-    },
-  ];
-
-  static IconData _iconForCategory(String cat) {
-    switch (cat) {
-      case 'Obsession':
-        return Icons.lock;
-      case 'Detachment':
-        return Icons.air;
-      case 'Glow Up':
-        return Icons.auto_awesome;
-      case 'Road Opener':
-        return Icons.lock_open;
-      default:
-        return Icons.star_outline;
-    }
-  }
-
-  late List<Map<String, dynamic>> _cards;
+  List<ManifestationRitual> _rituals = [];
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    final custom = widget.storageService.getCustomAffirmations();
-    final customCards = custom
-        .map<Map<String, dynamic>>((a) => {
-              'text': a['text']!,
-              'cat': a['cat']!,
-              'icon': _iconForCategory(a['cat']!),
-            })
-        .toList();
-    _cards = [..._defaultAffirmations, ...customCards];
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final list = await FirestoreService().getRituals(widget.uid).first;
+      if (mounted) setState(() { _rituals = list; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   void _removeCard() {
-    setState(() {
-      _cards.removeAt(0);
-    });
-    if (_cards.isEmpty) {
+    setState(() => _rituals.removeAt(0));
+    if (_rituals.isEmpty) {
       Future.delayed(const Duration(milliseconds: 300), widget.onComplete);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_cards.isEmpty)
+    if (_loading) {
       return const Center(
-          child: Text("Complete", style: TextStyle(color: Colors.grey)));
+        child: CircularProgressIndicator(color: Color(0xFFA855F7), strokeWidth: 2),
+      );
+    }
 
-    final activeCard = _cards[0];
+    if (_rituals.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.auto_awesome_outlined, color: Colors.grey[700], size: 48),
+            const SizedBox(height: 16),
+            const Text('No manifestations yet',
+                style: TextStyle(color: Colors.white, fontSize: 16)),
+            const SizedBox(height: 8),
+            Text('Add them in the Rituals tab',
+                style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+            const SizedBox(height: 32),
+            GestureDetector(
+              onTap: widget.onComplete,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                ),
+                child: const Text('Continue',
+                    style: TextStyle(color: Colors.white, fontSize: 14)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Column(
       children: [
-        Container(
-          margin: const EdgeInsets.only(top: 20, bottom: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(activeCard['icon'],
-                  size: 14, color: const Color(0xFFA855F7)),
-              const SizedBox(width: 6),
-              Text(
-                activeCard['cat'],
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey),
-              ),
-            ],
-          ),
-        ),
+        const SizedBox(height: 20),
         const Spacer(),
         SizedBox(
           height: 400,
           width: 320,
           child: Stack(
-            children: _cards.reversed.map((card) {
-              final isTop = card == _cards[0];
+            children: _rituals.reversed.map((ritual) {
+              final isTop = ritual == _rituals[0];
               return isTop
                   ? Dismissible(
-                      key: ValueKey(card),
+                      key: ValueKey(ritual.id),
                       onDismissed: (_) => _removeCard(),
-                      child: _buildCardUI(card, isTop: true),
+                      child: _buildCardUI(ritual, index: 0, isTop: true),
                     )
                   : Padding(
-                      padding: const EdgeInsets.only(top: 8), // Stack effect
+                      padding: const EdgeInsets.only(top: 8),
                       child: Transform.scale(
-                          scale: 0.95, child: _buildCardUI(card, isTop: false)),
+                          scale: 0.95,
+                          child: _buildCardUI(ritual,
+                              index: _rituals.indexOf(ritual), isTop: false)),
                     );
             }).toList(),
           ),
@@ -2755,7 +2899,8 @@ class _AffirmationStepState extends State<AffirmationStep> {
     );
   }
 
-  Widget _buildCardUI(Map<String, dynamic> card, {required bool isTop}) {
+  Widget _buildCardUI(ManifestationRitual ritual,
+      {required int index, required bool isTop}) {
     return Container(
       width: 320,
       height: 400,
@@ -2765,12 +2910,10 @@ class _AffirmationStepState extends State<AffirmationStep> {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
         boxShadow: isTop
-            ? [
-                BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10))
-              ]
+            ? [BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 20,
+                offset: const Offset(0, 10))]
             : [],
       ),
       child: Column(
@@ -2779,34 +2922,53 @@ class _AffirmationStepState extends State<AffirmationStep> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("CARD",
+              Text('CAST',
                   style: TextStyle(
                       fontSize: 10,
                       letterSpacing: 1.5,
                       color: Colors.grey[600],
                       fontWeight: FontWeight.w600)),
-              Text("0${_cards.indexOf(card) + 1}",
-                  style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey[600],
-                      fontFamily: 'Monospace')),
+              Text((index + 1).toString().padLeft(2, '0'),
+                  style: TextStyle(fontSize: 10, color: Colors.grey[600])),
             ],
           ),
           Text(
-            card['text'],
+            ritual.title,
             textAlign: TextAlign.center,
             style: const TextStyle(
-                fontSize: 22,
-                height: 1.4,
-                color: Colors.white,
+                fontSize: 22, height: 1.4, color: Colors.white,
                 fontWeight: FontWeight.w400),
           ),
+          if (ritual.tags.isNotEmpty)
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              alignment: WrapAlignment.center,
+              children: ritual.tags
+                  .map((tag) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFA855F7)
+                              .withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: const Color(0xFFA855F7)
+                                  .withValues(alpha: 0.3)),
+                        ),
+                        child: Text(tag,
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFFD8B4FE))),
+                      ))
+                  .toList(),
+            ),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.swipe_left, size: 16, color: Colors.grey[700]),
               const SizedBox(width: 8),
-              Text("SWIPE TO ABSORB",
+              Text('SWIPE TO ABSORB',
                   style: TextStyle(
                       fontSize: 10,
                       letterSpacing: 1.5,
@@ -2839,7 +3001,8 @@ class ReflectionStep extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                border:
+                    Border.all(color: Colors.white.withValues(alpha: 0.1)),
                 boxShadow: [
                   BoxShadow(
                       color: Colors.white.withValues(alpha: 0.05),
@@ -2866,17 +3029,19 @@ class ReflectionStep extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFF22C55E).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                     color: const Color(0xFF22C55E).withValues(alpha: 0.2)),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 14),
+                children: [
+                  Icon(Icons.check_circle,
+                      color: Color(0xFF22C55E), size: 14),
                   SizedBox(width: 8),
                   Text(
                     'SEALED',

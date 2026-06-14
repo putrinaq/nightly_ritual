@@ -1,3 +1,10 @@
+# Firebase service account keys (NEVER commit these)
+*.json
+!pubspec.json
+
+# Environment variables with secrets (copy .env.example → .env and fill in values)
+.env
+
 # Windows reserved device names
 nul
 con

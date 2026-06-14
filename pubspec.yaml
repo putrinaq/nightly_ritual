@@ -10,7 +10,6 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Required for the Cupertino icons used (e.g., CupertinoIcons.moon, heart_fill)
   cupertino_icons: ^1.0.8
 
   # Local storage for streak/ritual persistence
@@ -24,15 +23,28 @@ dependencies:
   # Local notifications for reminders
   flutter_local_notifications: ^18.0.1
   timezone: ^0.10.0
+  flutter_timezone: ^3.0.0
   permission_handler: ^11.3.1
+
+  # Firebase + Google Sign-In
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.0
+  cloud_firestore: ^5.5.0
+  google_sign_in: ^6.2.0
+
+  # Environment variables
+  flutter_dotenv: ^5.2.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.13.1
+
 flutter:
   uses-material-design: true
+  assets:
+    - .env
 
 flutter_launcher_icons:
   android: true

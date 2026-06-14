@@ -3,7 +3,11 @@
     "allow": [
       "Bash(flutter pub get:*)",
       "Bash(flutter build:*)",
-      "Bash(timeout 120 tail:*)"
+      "Bash(timeout 120 tail:*)",
+      "Bash(keytool -list -v -keystore \"%USERPROFILE%\\\\.android\\\\debug.keystore\" -alias androiddebugkey -storepass android -keypass android)",
+      "Bash(findstr SHA1)",
+      "Bash(keytool -list -v -keystore \"$env:USERPROFILE\\\\.android\\\\debug.keystore\" -alias androiddebugkey -storepass android -keypass android)",
+      "Bash(keytool -list -v -keystore \"C:\\\\Users\\\\Violet\\\\.android\\\\debug.keystore\" -alias androiddebugkey -storepass android -keypass android)"
     ]
   }
 }
