@@ -6,6 +6,8 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../utils/dates.dart';
+
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -24,37 +26,38 @@ class NotificationService {
 
   Future<void> init() async {
     if (_isInitialized) return;
-
-    // Initialize timezone using the device's local timezone
-    tz_data.initializeTimeZones();
-    final deviceTimezone = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(deviceTimezone));
-
-    // Android settings
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    // iOS/macOS settings
-    const darwinSettings = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
-    );
-
-    const initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: darwinSettings,
-      macOS: darwinSettings,
-    );
-
-    await _notifications.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: _onNotificationTapped,
-    );
-
-    // Create notification channel for Android
-    await _createNotificationChannel();
-
     _isInitialized = true;
+    if (kIsWeb) return; // No local notifications on web.
+
+    try {
+      // Initialize timezone using the device's local timezone
+      tz_data.initializeTimeZones();
+      final deviceTimezone = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(deviceTimezone));
+
+      const androidSettings =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+      const darwinSettings = DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      );
+      const initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: darwinSettings,
+        macOS: darwinSettings,
+      );
+
+      await _notifications.initialize(
+        initSettings,
+        onDidReceiveNotificationResponse: _onNotificationTapped,
+      );
+      await _createNotificationChannel();
+    } catch (e) {
+      // A bad timezone id or missing platform support shouldn't stop the app
+      // from starting; reminders just won't schedule.
+      debugPrint('Notification init failed: $e');
+    }
   }
 
   Future<void> _createNotificationChannel() async {
@@ -162,8 +165,8 @@ class NotificationService {
         icon: '@mipmap/ic_launcher',
         largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
         styleInformation: BigTextStyleInformation(
-          'The moon awaits. Take a moment to align your energy and manifest your intentions.',
-          contentTitle: '🌙 Time for Your Nightly Ritual',
+          "The moon is up. Take ten quiet minutes for tonight's ritual.",
+          contentTitle: 'Time for your nightly ritual',
           summaryText: 'Nightly Ritual',
         ),
       );
@@ -183,8 +186,8 @@ class NotificationService {
       // Schedule the notification to repeat daily
       await _notifications.zonedSchedule(
         _reminderNotificationId,
-        '🌙 Time for Your Nightly Ritual',
-        'The moon awaits. Tap to begin your manifestation.',
+        'Time for your nightly ritual',
+        'The moon is up. Tap to begin.',
         scheduledDate,
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
@@ -203,6 +206,7 @@ class NotificationService {
 
   // Cancel the reminder
   Future<void> cancelReminder() async {
+    if (kIsWeb) return;
     await _notifications.cancel(_reminderNotificationId);
     debugPrint('Reminder cancelled');
   }
@@ -215,8 +219,9 @@ class NotificationService {
         .any((n) => n.id == _reminderNotificationId);
   }
 
-  // Show a test notification immediately
-  Future<void> showTestNotification() async {
+  // Confirms a newly set reminder with an immediate notification
+  Future<void> showConfirmation(String timeLabel) async {
+    if (kIsWeb) return;
     const androidDetails = AndroidNotificationDetails(
       _channelId,
       _channelName,
@@ -240,8 +245,8 @@ class NotificationService {
 
     await _notifications.show(
       0,
-      '🌙 Nightly Ritual',
-      'Your reminder is set! This is a test notification.',
+      'Reminder set',
+      "We'll nudge you at $timeLabel each night.",
       notificationDetails,
     );
   }
@@ -272,13 +277,7 @@ class ReminderPreferences {
     await _prefs.setInt(_reminderMinuteKey, minute);
   }
 
-  String get timeFormatted {
-    final h = hour;
-    final m = minute;
-    final period = h >= 12 ? 'PM' : 'AM';
-    final displayHour = h > 12 ? h - 12 : (h == 0 ? 12 : h);
-    return '$displayHour:${m.toString().padLeft(2, '0')} $period';
-  }
+  String get timeFormatted => Dates.time(hour, minute);
 
   TimeOfDay get timeOfDay => TimeOfDay(hour: hour, minute: minute);
 }

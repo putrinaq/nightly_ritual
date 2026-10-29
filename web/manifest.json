@@ -1,11 +1,11 @@
 {
-    "name": "nightly_ritual",
-    "short_name": "nightly_ritual",
+    "name": "Nightly Ritual",
+    "short_name": "Ritual",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#07080B",
+    "theme_color": "#07080B",
+    "description": "A quiet nightly ritual: breathe, listen, read your intentions, seal the night.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

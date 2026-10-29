@@ -26,6 +26,18 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Spotify OAuth callback scheme, read from SPOTIFY_REDIRECT_URI in the
+        // project's .env so a custom redirect only has to be set in one place.
+        val envFile = rootProject.file("../.env")
+        val redirect = if (envFile.exists()) {
+            envFile.readLines()
+                .map { it.trim() }
+                .firstOrNull { it.startsWith("SPOTIFY_REDIRECT_URI=") }
+                ?.substringAfter("=")?.trim()?.trim('"', '\'')
+        } else null
+        manifestPlaceholders["spotifyRedirectScheme"] =
+            redirect?.takeIf { "://" in it }?.substringBefore("://") ?: "ritual"
     }
 
     buildTypes {

@@ -25,11 +25,14 @@ class MoonPhaseInfo {
   });
 
   String get illuminationPercent => '${(illumination * 100).round()}%';
+
+  /// Position in the lunar cycle, 0 = new, 0.5 = full, approaching 1 = new.
+  double get cycleFraction => age / MoonPhaseService.lunarCycle;
 }
 
 class MoonPhaseService {
   // Average lunar cycle length in days
-  static const double _lunarCycle = 29.53058867;
+  static const double lunarCycle = 29.53058867;
 
   // Reference new moon date (Jan 6, 2000 at 18:14 UTC)
   static final DateTime _referenceNewMoon = DateTime.utc(2000, 1, 6, 18, 14);
@@ -58,13 +61,13 @@ class MoonPhaseService {
   static double _getMoonAge(DateTime date) {
     final diff = date.toUtc().difference(_referenceNewMoon);
     final days = diff.inSeconds / 86400.0;
-    return days % _lunarCycle;
+    return days % lunarCycle;
   }
 
   // Determine phase from age
   static MoonPhaseType _getPhaseFromAge(double age) {
     // Each phase is roughly 3.69 days
-    const phaseLength = _lunarCycle / 8;
+    const phaseLength = lunarCycle / 8;
 
     if (age < phaseLength * 0.5) {
       return MoonPhaseType.newMoon;
@@ -91,7 +94,7 @@ class MoonPhaseService {
   static double _getIllumination(double age) {
     // Use cosine to calculate illumination
     // 0 at new moon, 1 at full moon
-    final angle = (age / _lunarCycle) * 2 * math.pi;
+    final angle = (age / lunarCycle) * 2 * math.pi;
     return (1 - math.cos(angle)) / 2;
   }
 
@@ -121,21 +124,21 @@ class MoonPhaseService {
   static String getRitualMeaning(MoonPhaseType phase) {
     switch (phase) {
       case MoonPhaseType.newMoon:
-        return 'Perfect for new beginnings and setting intentions';
+        return 'A dark sky for new beginnings. Set one clear intention.';
       case MoonPhaseType.waxingCrescent:
-        return 'Time to take action on your intentions';
+        return 'The light is growing. Take a small step toward what you want.';
       case MoonPhaseType.firstQuarter:
-        return 'Face challenges and make decisions';
+        return 'Half lit, half waiting. A good night to make a decision.';
       case MoonPhaseType.waxingGibbous:
-        return 'Refine and adjust your approach';
+        return 'Almost full. Refine what you asked for.';
       case MoonPhaseType.fullMoon:
-        return 'Peak energy for manifestation and release';
+        return 'The brightest night of the cycle. Ask boldly, then let go.';
       case MoonPhaseType.waningGibbous:
-        return 'Share wisdom and practice gratitude';
+        return 'The light is easing off. Name three things you are grateful for.';
       case MoonPhaseType.lastQuarter:
-        return 'Release what no longer serves you';
+        return 'Release one thing that no longer fits.';
       case MoonPhaseType.waningCrescent:
-        return 'Rest, reflect, and prepare for renewal';
+        return 'A thin moon. Rest and let the cycle close.';
     }
   }
 }

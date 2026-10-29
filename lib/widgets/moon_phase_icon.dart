@@ -1,189 +1,153 @@
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
-import '../services/moon_phase_service.dart';
 
+import 'package:flutter/material.dart';
+
+import '../theme/app_theme.dart';
+
+/// Draws the moon as it actually looks tonight: a lit limb plus an
+/// elliptical terminator whose width follows the cycle, so every night of
+/// the month renders differently (not just eight stock shapes).
 class MoonPhaseIcon extends StatelessWidget {
-  final MoonPhaseType phase;
+  /// 0 = new moon, 0.5 = full moon.
+  final double cycleFraction;
   final double size;
-  final Color color;
+  final bool glow;
+  final bool detailed;
 
   const MoonPhaseIcon({
     super.key,
-    required this.phase,
+    required this.cycleFraction,
     this.size = 28,
-    this.color = const Color(0xFFE9D5FF),
+    this.glow = false,
+    this.detailed = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size(size, size),
-      painter: MoonPhasePainter(phase: phase, color: color),
+    return RepaintBoundary(
+      child: CustomPaint(
+        size: Size.square(size),
+        painter: MoonPhasePainter(
+          cycleFraction: cycleFraction,
+          glow: glow,
+          detailed: detailed,
+        ),
+      ),
     );
   }
 }
 
 class MoonPhasePainter extends CustomPainter {
-  final MoonPhaseType phase;
-  final Color color;
+  final double cycleFraction;
+  final bool glow;
+  final bool detailed;
 
-  MoonPhasePainter({required this.phase, required this.color});
+  MoonPhasePainter({
+    required this.cycleFraction,
+    this.glow = false,
+    this.detailed = false,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 1;
+    final r = size.width / 2;
+    final c = Offset(r, r);
+    final disk = Rect.fromCircle(center: c, radius: r);
+    final f = cycleFraction % 1.0;
+    final illumination = (1 - math.cos(f * 2 * math.pi)) / 2;
 
-    // Base moon outline
-    final outlinePaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-
-    // Filled part paint
-    final fillPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    // Dark part paint (for the shadow)
-    final darkPaint = Paint()
-      ..color = color.withValues(alpha: 0.1)
-      ..style = PaintingStyle.fill;
-
-    // Draw the base circle outline
-    canvas.drawCircle(center, radius, outlinePaint);
-
-    switch (phase) {
-      case MoonPhaseType.newMoon:
-        // Just the outline, moon is dark
-        canvas.drawCircle(center, radius - 1, darkPaint);
-        break;
-
-      case MoonPhaseType.waxingCrescent:
-        _drawCrescent(canvas, size, radius, fillPaint, darkPaint, isWaxing: true, crescentSize: 0.3);
-        break;
-
-      case MoonPhaseType.firstQuarter:
-        _drawHalf(canvas, size, radius, fillPaint, darkPaint, isRight: true);
-        break;
-
-      case MoonPhaseType.waxingGibbous:
-        _drawGibbous(canvas, size, radius, fillPaint, darkPaint, isWaxing: true);
-        break;
-
-      case MoonPhaseType.fullMoon:
-        canvas.drawCircle(center, radius - 1, fillPaint);
-        break;
-
-      case MoonPhaseType.waningGibbous:
-        _drawGibbous(canvas, size, radius, fillPaint, darkPaint, isWaxing: false);
-        break;
-
-      case MoonPhaseType.lastQuarter:
-        _drawHalf(canvas, size, radius, fillPaint, darkPaint, isRight: false);
-        break;
-
-      case MoonPhaseType.waningCrescent:
-        _drawCrescent(canvas, size, radius, fillPaint, darkPaint, isWaxing: false, crescentSize: 0.3);
-        break;
-    }
-  }
-
-  void _drawHalf(Canvas canvas, Size size, double radius, Paint fillPaint, Paint darkPaint, {required bool isRight}) {
-    final center = Offset(size.width / 2, size.height / 2);
-
-    // Draw the dark half
-    final darkPath = Path();
-    if (isRight) {
-      darkPath.moveTo(center.dx, center.dy - radius);
-      darkPath.arcTo(
-        Rect.fromCircle(center: center, radius: radius - 1),
-        -math.pi / 2,
-        math.pi,
-        false,
+    if (glow && illumination > 0.02) {
+      canvas.drawCircle(
+        c,
+        r * 1.05,
+        Paint()
+          ..color = AppColors.moonSurface.withValues(alpha: 0.10 + 0.22 * illumination)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * 0.55),
       );
-      darkPath.close();
-      canvas.drawPath(darkPath, darkPaint);
-    } else {
-      darkPath.moveTo(center.dx, center.dy - radius);
-      darkPath.arcTo(
-        Rect.fromCircle(center: center, radius: radius - 1),
-        -math.pi / 2,
-        -math.pi,
-        false,
-      );
-      darkPath.close();
-      canvas.drawPath(darkPath, darkPaint);
     }
 
-    // Draw the lit half
-    final litPath = Path();
-    if (isRight) {
-      litPath.moveTo(center.dx, center.dy - radius);
-      litPath.arcTo(
-        Rect.fromCircle(center: center, radius: radius - 1),
-        -math.pi / 2,
-        -math.pi,
-        false,
+    // Unlit body: barely there, like earthshine.
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(0.2, -0.2),
+          colors: [Colors.white.withValues(alpha: 0.05), Colors.white.withValues(alpha: 0.015)],
+        ).createShader(disk),
+    );
+
+    final lit = _litPath(c, r, f);
+    canvas.save();
+    canvas.clipPath(lit);
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.3, -0.35),
+          radius: 1.1,
+          colors: [Color(0xFFFAF6EC), AppColors.moonSurface, Color(0xFFCFC7B3)],
+          stops: [0, 0.55, 1],
+        ).createShader(disk),
+    );
+    if (detailed) _paintMaria(canvas, c, r);
+    canvas.restore();
+
+    canvas.drawCircle(
+      c,
+      r - 0.5,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = Colors.white.withValues(alpha: 0.07),
+    );
+  }
+
+  Path _litPath(Offset c, double r, double f) {
+    final waxing = f < 0.5;
+    // cos goes 1 (new) → -1 (full) → 1 (new). Its magnitude is the
+    // terminator's horizontal radius; its sign says crescent vs gibbous.
+    final t = math.cos(f * 2 * math.pi);
+    final rx = (r * t.abs()).clamp(0.001, r);
+    final ellipse = Rect.fromCenter(center: c, width: rx * 2, height: r * 2);
+    final disk = Rect.fromCircle(center: c, radius: r);
+
+    final path = Path()..moveTo(c.dx, c.dy - r);
+    // Lit limb: the right edge while waxing, left while waning.
+    path.arcTo(disk, -math.pi / 2, waxing ? math.pi : -math.pi, false);
+    // Terminator back to the top. For crescents it bows toward the lit
+    // limb, for gibbous phases it bows away from it.
+    final crescent = t > 0;
+    final bowRight = waxing == crescent;
+    path.arcTo(ellipse, math.pi / 2, bowRight ? -math.pi : math.pi, false);
+    path.close();
+    return path;
+  }
+
+  void _paintMaria(Canvas canvas, Offset c, double r) {
+    // Soft, irregular seas — suggested, not drawn.
+    final paint = Paint()
+      ..color = const Color(0xFF9A927F).withValues(alpha: 0.13)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * 0.09);
+    final seas = [
+      (-0.26, -0.20, 0.50, 0.30),
+      (-0.06, -0.34, 0.26, 0.20),
+      (0.22, -0.18, 0.30, 0.38),
+      (0.10, 0.22, 0.36, 0.22),
+      (-0.34, 0.20, 0.22, 0.30),
+    ];
+    for (final (dx, dy, w, h) in seas) {
+      canvas.drawOval(
+        Rect.fromCenter(center: c + Offset(r * dx, r * dy), width: r * w * 1.4, height: r * h * 1.4),
+        paint,
       );
-      litPath.close();
-    } else {
-      litPath.moveTo(center.dx, center.dy - radius);
-      litPath.arcTo(
-        Rect.fromCircle(center: center, radius: radius - 1),
-        -math.pi / 2,
-        math.pi,
-        false,
-      );
-      litPath.close();
     }
-    canvas.drawPath(litPath, fillPaint);
-  }
-
-  void _drawCrescent(Canvas canvas, Size size, double radius, Paint fillPaint, Paint darkPaint, {required bool isWaxing, required double crescentSize}) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final r = radius - 1;
-
-    // First fill the whole moon with dark
-    canvas.drawCircle(center, r, darkPaint);
-
-    // Create crescent by subtracting a circle
-    final path = Path();
-    path.addOval(Rect.fromCircle(center: center, radius: r));
-
-    final innerOffset = isWaxing ? -r * (1 - crescentSize) : r * (1 - crescentSize);
-    final innerCenter = Offset(center.dx + innerOffset, center.dy);
-
-    final innerPath = Path();
-    innerPath.addOval(Rect.fromCircle(center: innerCenter, radius: r * 0.9));
-
-    final crescentPath = Path.combine(PathOperation.difference, path, innerPath);
-    canvas.drawPath(crescentPath, fillPaint);
-  }
-
-  void _drawGibbous(Canvas canvas, Size size, double radius, Paint fillPaint, Paint darkPaint, {required bool isWaxing}) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final r = radius - 1;
-
-    // Fill the moon
-    canvas.drawCircle(center, r, fillPaint);
-
-    // Create shadow crescent
-    final path = Path();
-    path.addOval(Rect.fromCircle(center: center, radius: r));
-
-    final innerOffset = isWaxing ? r * 0.5 : -r * 0.5;
-    final innerCenter = Offset(center.dx + innerOffset, center.dy);
-
-    final innerPath = Path();
-    innerPath.addOval(Rect.fromCircle(center: innerCenter, radius: r * 0.8));
-
-    final shadowPath = Path.combine(PathOperation.difference, path, innerPath);
-    canvas.drawPath(shadowPath, darkPaint);
   }
 
   @override
-  bool shouldRepaint(covariant MoonPhasePainter oldDelegate) {
-    return oldDelegate.phase != phase || oldDelegate.color != color;
-  }
+  bool shouldRepaint(covariant MoonPhasePainter old) =>
+      old.cycleFraction != cycleFraction ||
+      old.glow != glow ||
+      old.detailed != detailed;
 }

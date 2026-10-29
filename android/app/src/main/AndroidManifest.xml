@@ -31,6 +31,19 @@
             </intent-filter>
         </activity>
 
+        <!-- Spotify sign-in: receives the OAuth redirect. The scheme comes from
+             SPOTIFY_REDIRECT_URI in .env (see app/build.gradle.kts). -->
+        <activity
+            android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
+            android:exported="true">
+            <intent-filter android:label="flutter_web_auth_2">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${spotifyRedirectScheme}" />
+            </intent-filter>
+        </activity>
+
         <!-- flutter_local_notifications: receives scheduled alarms -->
         <receiver
             android:exported="false"
@@ -63,6 +76,15 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- url_launcher: lets playlist links resolve to Spotify/YouTube/browser on Android 11+ -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="spotify"/>
         </intent>
     </queries>
 </manifest>

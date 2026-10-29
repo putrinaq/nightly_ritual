@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<title>Signed in</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{background:#07080B;color:#EDEBE5;font:15px/1.5 system-ui,sans-serif;display:grid;place-items:center;height:100vh;margin:0}</style>
+<p>Spotify is connected. You can close this window.</p>
+<script>
+  // Hands the OAuth redirect back to the app (flutter_web_auth_2).
+  const message = { 'flutter-web-auth-2': window.location.href };
+  if (window.opener) {
+    window.opener.postMessage(message, window.location.origin);
+    window.close();
+  } else if (window.parent && window.parent !== window) {
+    window.parent.postMessage(message, window.location.origin);
+  } else {
+    localStorage.setItem('flutter-web-auth-2', window.location.href);
+    window.close();
+  }
+</script>

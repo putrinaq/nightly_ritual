@@ -1,46 +1,65 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+
 import '../services/auth_service.dart';
-import '../services/ritual_storage_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/controls.dart';
+import '../widgets/glass.dart';
+import '../widgets/motion.dart';
+import '../widgets/shell.dart';
+import '../widgets/sheets.dart';
+import '../widgets/spotify_connect.dart';
 
 class ProfilePage extends StatelessWidget {
   final User user;
-  final RitualStorageService storageService;
+  final int streakDays;
+  final int totalRituals;
 
   const ProfilePage({
     super.key,
     required this.user,
-    required this.storageService,
+    required this.streakDays,
+    required this.totalRituals,
   });
+
+  static const _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  Future<void> _signOut(BuildContext context) async {
+    final ok = await confirmDestructive(
+      context,
+      title: 'Sign out?',
+      message: 'Your intentions and habits stay saved to your account.',
+      confirmLabel: 'Sign out',
+    );
+    if (!ok) return;
+    try {
+      await AuthService().signOut();
+    } catch (_) {
+      if (context.mounted) showToast(context, "Couldn't sign out. Try again.");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final streak = storageService.getStreakDays();
-    final total = storageService.getTotalRituals();
-    final name = user.displayName ?? 'Mystic';
+    final name = (user.displayName?.trim().isNotEmpty ?? false) ? user.displayName!.trim() : 'Night owl';
     final email = user.email ?? '';
-    final photoUrl = user.photoURL;
+    final since = user.metadata.creationTime;
+    final bottom = ShellInsets.bottomOf(context);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 100),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Profile',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.w300,
-              ),
-            ),
-            const SizedBox(height: 28),
-            // Avatar + Info
-            Row(
+    return SafeArea(
+      bottom: false,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, bottom + 8),
+        children: [
+          const Reveal(child: Text('Profile', style: AppType.title)),
+          const SizedBox(height: 28),
+          Reveal(
+            delay: Reveal.stagger(1),
+            child: Row(
               children: [
-                _Avatar(photoUrl: photoUrl, name: name),
+                _Avatar(photoUrl: user.photoURL, name: name),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -48,309 +67,166 @@ class ProfilePage extends StatelessWidget {
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        email,
-                        style: TextStyle(
-                          color: Colors.grey[500],
-                          fontSize: 13,
-                        ),
+                        style: AppType.heading,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFA855F7).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(0xFFA855F7)
-                                .withValues(alpha: 0.25),
-                          ),
+                      if (since != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Here since ${_months[since.month - 1]} ${since.year}',
+                          style: AppType.secondary,
                         ),
-                        child: const Text(
-                          '✨ Manifestor',
-                          style: TextStyle(
-                            color: Color(0xFFD8B4FE),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 28),
-            // Stats
-            Row(
-              children: [
-                Expanded(
-                  child: _StatCard(
-                    icon: Icons.local_fire_department,
-                    value: '$streak',
-                    label: 'Day Streak',
-                    color: const Color(0xFFF97316),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _StatCard(
-                    icon: Icons.auto_awesome,
-                    value: '$total',
-                    label: 'Rituals Cast',
-                    color: const Color(0xFFA855F7),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 28),
-            // Account section
-            _SectionLabel('ACCOUNT'),
-            const SizedBox(height: 12),
-            _InfoRow(
-              icon: Icons.person_outline,
-              title: 'Display Name',
-              value: name,
-            ),
-            const SizedBox(height: 8),
-            _InfoRow(
-              icon: Icons.email_outlined,
-              title: 'Email',
-              value: email,
-            ),
-            const SizedBox(height: 28),
-            // Sign out
-            _SectionLabel('SESSION'),
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: () => _confirmSignOut(context),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: Colors.red.withValues(alpha: 0.15),
-                  ),
-                ),
+          ),
+          const SizedBox(height: 24),
+          Reveal(
+            delay: Reveal.stagger(2),
+            child: Glass(
+              radius: AppRadius.lg,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              child: IntrinsicHeight(
                 child: Row(
                   children: [
-                    Icon(Icons.logout,
-                        color: Colors.red[400], size: 20),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Sign Out',
-                      style: TextStyle(
-                        color: Colors.red[400],
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const Spacer(),
-                    Icon(Icons.chevron_right,
-                        color: Colors.red[800], size: 18),
+                    Expanded(child: _Stat(value: streakDays, label: 'night streak')),
+                    const VerticalDivider(width: 1, thickness: 1, color: AppColors.hairline),
+                    Expanded(child: _Stat(value: totalRituals, label: 'rituals sealed')),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _confirmSignOut(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF0D0D0D),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[800],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Sign Out',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'You\'ll need to sign in again to access your rituals.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[500], fontSize: 13),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  await AuthService().signOut();
-                },
-                style: TextButton.styleFrom(
-                  backgroundColor: Colors.red.withValues(alpha: 0.1),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.red.withValues(alpha: 0.2)),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: Text(
-                  'Sign Out',
-                  style: TextStyle(
-                    color: Colors.red[400],
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
+          ),
+          const SizedBox(height: 28),
+          Reveal(
+            delay: Reveal.stagger(3),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const FieldLabel('Account'),
+                Glass(
+                  radius: AppRadius.lg,
+                  child: Column(
+                    children: [
+                      _InfoRow(icon: Icons.person_outline_rounded, title: 'Name', value: name),
+                      const GlassDivider(indent: 66),
+                      _InfoRow(
+                        icon: Icons.alternate_email_rounded,
+                        title: 'Email',
+                        value: email.isEmpty ? 'Not shared' : email,
+                      ),
+                      const GlassDivider(indent: 66),
+                      const _InfoRow(
+                        icon: Icons.verified_user_outlined,
+                        title: 'Signed in with',
+                        value: 'Google',
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: 15,
+                const SizedBox(height: 28),
+                const FieldLabel('Music'),
+                const SpotifyConnectCard(),
+                const SizedBox(height: 28),
+                Pressable(
+                  onTap: () => _signOut(context),
+                  scale: 0.985,
+                  child: const Glass(
+                    radius: AppRadius.lg,
+                    padding: EdgeInsets.fromLTRB(16, 14, 14, 14),
+                    child: Row(
+                      children: [
+                        RowIcon(Icons.logout_rounded, color: AppColors.danger),
+                        SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            'Sign out',
+                            style: TextStyle(
+                              fontFamily: AppType.sans,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.danger,
+                            ),
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary, size: 20),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
+class _Stat extends StatelessWidget {
+  final int value;
+  final String label;
+  const _Stat({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        CountUp(value: value, style: AppType.number),
+        const SizedBox(height: 4),
+        Text(label, style: AppType.caption),
+      ],
+    );
+  }
+}
+
+/// Rounded-square avatar (not another circle), with initials as fallback.
 class _Avatar extends StatelessWidget {
   final String? photoUrl;
   final String name;
 
   const _Avatar({this.photoUrl, required this.name});
 
+  String get _initials {
+    // Split on any whitespace and drop empties: "Ana  Lima" used to yield an
+    // empty middle part and crash on parts[1][0].
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    final first = parts.first.characters.first;
+    final second = parts.length > 1 ? parts[1].characters.first : '';
+    return (first + second).toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final fallback = Center(
+      child: Text(_initials, style: AppType.heading.copyWith(color: AppColors.accent)),
+    );
     return Container(
-      width: 64,
-      height: 64,
+      width: 68,
+      height: 68,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [Color(0xFFA855F7), Color(0xFF7C3AED)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(
-            color: const Color(0xFFA855F7).withValues(alpha: 0.3), width: 2),
+        color: AppColors.accentTint(0.10),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.white(0.12)),
       ),
-      child: photoUrl != null
-          ? ClipOval(
-              child: Image.network(
-                photoUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _initials(name),
+      clipBehavior: Clip.antiAlias,
+      child: photoUrl == null
+          ? fallback
+          : Image.network(
+              photoUrl!,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => fallback,
+              frameBuilder: (context, child, frame, sync) => AnimatedOpacity(
+                opacity: frame == null && !sync ? 0 : 1,
+                duration: Motion.base,
+                child: child,
               ),
-            )
-          : _initials(name),
-    );
-  }
-
-  Widget _initials(String name) {
-    final parts = name.trim().split(' ');
-    final initials = parts.length >= 2
-        ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
-        : name.isNotEmpty
-            ? name[0].toUpperCase()
-            : '?';
-    return Center(
-      child: Text(
-        initials,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color color;
-
-  const _StatCard({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A0A0A),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 16),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.w500,
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -360,61 +236,32 @@ class _InfoRow extends StatelessWidget {
   final String title;
   final String value;
 
-  const _InfoRow({
-    required this.icon,
-    required this.title,
-    required this.value,
-  });
+  const _InfoRow({required this.icon, required this.title, required this.value});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A0A0A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
       child: Row(
         children: [
-          Icon(icon, color: Colors.grey[600], size: 18),
-          const SizedBox(width: 12),
+          RowIcon(icon),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 11),
-                ),
+                Text(title, style: AppType.caption),
                 const SizedBox(height: 2),
                 Text(
                   value,
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  style: AppType.body,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: 10,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 1.2,
-        color: Colors.grey[600],
       ),
     );
   }

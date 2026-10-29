@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../utils/dates.dart';
+
 class Habit {
   final String id;
   final String name;
@@ -38,29 +40,27 @@ class Habit {
     };
   }
 
-  static String dateString(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  static String dateString(DateTime d) => Dates.key(d);
 
-  static String get todayString => dateString(DateTime.now());
+  static String get todayString => Dates.todayKey();
 
   bool get isCompletedToday => completedDates.contains(todayString);
 
   bool isCompletedOn(DateTime date) => completedDates.contains(dateString(date));
 
-  int get currentStreak {
+  int get currentStreak => streakAsOf(DateTime.now());
+
+  /// Consecutive completed days ending today, or ending yesterday when today
+  /// isn't done yet (the streak is still alive until midnight).
+  int streakAsOf(DateTime now) {
     if (completedDates.isEmpty) return 0;
-    final today = dateString(DateTime.now());
-    final yesterday = dateString(DateTime.now().subtract(const Duration(days: 1)));
-    if (!completedDates.contains(today) && !completedDates.contains(yesterday)) {
-      return 0;
-    }
-    int streak = 0;
-    DateTime date = completedDates.contains(today)
-        ? DateTime.now()
-        : DateTime.now().subtract(const Duration(days: 1));
-    while (completedDates.contains(dateString(date))) {
+    final done = completedDates.toSet();
+    var day = Dates.dayOnly(now);
+    if (!done.contains(Dates.key(day))) day = Dates.addDays(day, -1);
+    var streak = 0;
+    while (done.contains(Dates.key(day))) {
       streak++;
-      date = date.subtract(const Duration(days: 1));
+      day = Dates.addDays(day, -1);
     }
     return streak;
   }

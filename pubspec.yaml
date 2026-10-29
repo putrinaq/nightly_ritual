@@ -1,5 +1,5 @@
 name: nightly_ritual
-description: A Linear-style nightly manifestation and ritual app.
+description: A quiet nightly ritual app for breathing, intentions and habits.
 publish_to: "none"
 version: 1.0.0+1
 
@@ -16,6 +16,11 @@ dependencies:
   shared_preferences: ^2.3.0
 
   url_launcher: ^6.2.5
+
+  # Spotify Web API (Authorization Code + PKCE; no client secret in the app)
+  flutter_web_auth_2: ^4.1.0
+  http: ^1.4.0
+  crypto: ^3.0.6
 
   # Local notifications for reminders
   flutter_local_notifications: ^18.0.1
@@ -42,6 +47,21 @@ flutter:
   uses-material-design: true
   assets:
     - .env
+
+  fonts:
+    - family: Geist
+      fonts:
+        - asset: assets/fonts/Geist-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Geist-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Geist-SemiBold.ttf
+          weight: 600
+    - family: InstrumentSerif
+      fonts:
+        - asset: assets/fonts/InstrumentSerif-Regular.ttf
+        - asset: assets/fonts/InstrumentSerif-Italic.ttf
+          style: italic
 
 flutter_launcher_icons:
   android: true

@@ -93,6 +93,27 @@
 
 <div align="center">
 
+<h2>₊˚⊹♡ ⋆｡˚ ☾ ˚｡⋆ ♡⊹˚₊</h2>
+<h3>✦ a peek inside ✦</h3>
+<h2>₊˚⊹♡ ⋆｡˚ ☾ ˚｡⋆ ♡⊹˚₊</h2>
+
+<br/>
+
+<img src="docs/screenshots/tonight.png" alt="Tonight: the ritual card under tonight's moon, with streak and rituals sealed" width="23%"/>
+<img src="docs/screenshots/intentions.png" alt="Intentions: intention cards read during Cast" width="23%"/>
+<img src="docs/screenshots/habits.png" alt="Habits: daily habits with a seven-night history" width="23%"/>
+<img src="docs/screenshots/profile.png" alt="Profile: streak, rituals sealed, account and Spotify connection" width="23%"/>
+
+<br/>
+
+<sub><i>tonight ✦ intentions ✦ habits ✦ profile</i></sub>
+
+</div>
+
+---
+
+<div align="center">
+
 <h2>⋆｡ﾟ☁︎｡⋆｡ ﾟ☾ ﾟ｡⋆</h2>
 <h3>✦ the nightly ritual ✦</h3>
 <h2>⋆｡ﾟ☁︎｡⋆｡ ﾟ☾ ﾟ｡⋆</h2>
@@ -326,12 +347,12 @@ A dreamy animated night sky sits behind the ritual experience.
 <pre>
 ╔══════════════════════════════════════════╗
 ║                                          ║
-║  Void Black       #030303                ║
-║  Midnight Ink     #0A0A0A                ║
-║  Moon Violet      #A855F7                ║
-║  Dream Indigo     #7C3AED                ║
-║  Starlight Pink   #DBB4FF                ║
-║  Ritual Green     #22C55E                ║
+║  Night Ink        #07080B                ║
+║  Raised Ink       #0E1016                ║
+║  Candlelight      #E7C894                ║
+║  Moon Surface     #F0EBDD                ║
+║  Parchment Text   #EDEBE5                ║
+║  Ember Coral      #E0806F  (destructive) ║
 ║                                          ║
 ╚══════════════════════════════════════════╝
 </pre>
@@ -341,14 +362,14 @@ A dreamy animated night sky sits behind the ritual experience.
 <div align="center">
 
 <pre>
-☾ linear-inspired layouts
-✦ glassmorphism cards
-☾ floating stars
-✦ dreamy gradients
-☾ cozy minimalism
-✦ moonlit aesthetics
-♡ soft violet glows
-୨୧ bento-style sections
+☾ Instrument Serif headlines, Geist for everything else
+✦ frosted glass with light-catching edges
+☾ a living sky: twinkling stars, moon glow, grain
+✦ one warm accent: candlelight on ink
+☾ the real moon phase, drawn to tonight's terminator
+✦ press-to-shrink feedback & staggered reveals
+♡ spring-physics intention cards
+୨୧ respects reduce motion & high contrast
 </pre>
 
 </div>

@@ -1,98 +1,86 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../utils/dates.dart';
+
+/// Local ritual progress (streak, last ritual date, total count).
+///
+/// Values are scoped per signed-in account so two people sharing a device
+/// don't share a streak. Progress saved before scoping existed (unprefixed
+/// keys) is handed to the first account that signs in, then removed.
 class RitualStorageService {
   static const String _streakKey = 'streak_days';
   static const String _lastRitualDateKey = 'last_ritual_date';
   static const String _totalRitualsKey = 'total_rituals';
-  static const String _customAffirmationsKey = 'custom_affirmations';
+  static const String _legacyAffirmationsKey = 'custom_affirmations';
 
   late SharedPreferences _prefs;
+  String _scope = '';
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+    // Custom affirmations were replaced by Firestore intentions.
+    await _prefs.remove(_legacyAffirmationsKey);
   }
 
-  // Streak Management
-  int getStreakDays() {
-    return _prefs.getInt(_streakKey) ?? 0;
-  }
-
-  Future<void> setStreakDays(int days) async {
-    await _prefs.setInt(_streakKey, days);
-  }
-
-  String? getLastRitualDate() {
-    return _prefs.getString(_lastRitualDateKey);
-  }
-
-  Future<void> setLastRitualDate(String date) async {
-    await _prefs.setString(_lastRitualDateKey, date);
-  }
-
-  // Total Rituals (Spells Cast)
-  int getTotalRituals() {
-    return _prefs.getInt(_totalRitualsKey) ?? 0;
-  }
-
-  Future<void> incrementTotalRituals() async {
-    final current = getTotalRituals();
-    await _prefs.setInt(_totalRitualsKey, current + 1);
-  }
-
-  // Check if ritual was completed today
-  bool isRitualCompletedToday() {
-    final lastDate = getLastRitualDate();
-    if (lastDate == null) return false;
-    final today = _formatDate(DateTime.now());
-    return lastDate == today;
-  }
-
-  // Complete a ritual and update streak
-  Future<void> completeRitual() async {
-    final today = _formatDate(DateTime.now());
-    final lastDate = getLastRitualDate();
-    final yesterday = _formatDate(DateTime.now().subtract(const Duration(days: 1)));
-
-    int currentStreak = getStreakDays();
-
-    if (lastDate == null) {
-      // First ritual ever
-      currentStreak = 1;
-    } else if (lastDate == yesterday) {
-      // Consecutive day - increment streak
-      currentStreak++;
-    } else if (lastDate != today) {
-      // Streak broken - reset to 1
-      currentStreak = 1;
+  /// Points storage at [uid]'s progress, migrating legacy progress once.
+  Future<void> useAccount(String uid) async {
+    _scope = 'u:$uid:';
+    final hasLegacy = _prefs.containsKey(_lastRitualDateKey) ||
+        _prefs.containsKey(_totalRitualsKey);
+    final hasScoped = _prefs.containsKey(_k(_lastRitualDateKey)) ||
+        _prefs.containsKey(_k(_totalRitualsKey));
+    if (hasLegacy && !hasScoped) {
+      final streak = _prefs.getInt(_streakKey);
+      final last = _prefs.getString(_lastRitualDateKey);
+      final total = _prefs.getInt(_totalRitualsKey);
+      if (streak != null) await _prefs.setInt(_k(_streakKey), streak);
+      if (last != null) await _prefs.setString(_k(_lastRitualDateKey), last);
+      if (total != null) await _prefs.setInt(_k(_totalRitualsKey), total);
     }
-    // If lastDate == today, don't change streak (already completed today)
-
-    await setStreakDays(currentStreak);
-    await setLastRitualDate(today);
-    await incrementTotalRituals();
+    if (hasLegacy) {
+      await _prefs.remove(_streakKey);
+      await _prefs.remove(_lastRitualDateKey);
+      await _prefs.remove(_totalRitualsKey);
+    }
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  String _k(String key) => '$_scope$key';
+
+  /// The live streak. The stored count only stays valid while the last ritual
+  /// was today or yesterday; after a missed night it reads as 0.
+  int getStreakDays([DateTime? now]) {
+    final last = getLastRitualDate();
+    if (last == null) return 0;
+    if (last != Dates.todayKey(now) && last != Dates.yesterdayKey(now)) {
+      return 0;
+    }
+    return _prefs.getInt(_k(_streakKey)) ?? 0;
   }
 
-  // Custom Affirmations (stored as "text\tcat" per entry)
-  List<Map<String, String>> getCustomAffirmations() {
-    final list = _prefs.getStringList(_customAffirmationsKey) ?? [];
-    return list.map((item) {
-      final tabIdx = item.indexOf('\t');
-      if (tabIdx < 0) return {'text': item, 'cat': 'Custom'};
-      return {
-        'text': item.substring(0, tabIdx),
-        'cat': item.substring(tabIdx + 1),
-      };
-    }).toList();
-  }
+  String? getLastRitualDate() => _prefs.getString(_k(_lastRitualDateKey));
 
-  Future<void> saveCustomAffirmations(
-      List<Map<String, String>> affirmations) async {
-    final list =
-        affirmations.map((a) => '${a['text']}\t${a['cat']}').toList();
-    await _prefs.setStringList(_customAffirmationsKey, list);
+  int getTotalRituals() => _prefs.getInt(_k(_totalRitualsKey)) ?? 0;
+
+  bool isRitualCompletedToday([DateTime? now]) =>
+      getLastRitualDate() == Dates.todayKey(now);
+
+  /// Records a completed ritual. Repeating on the same night counts toward
+  /// the total but doesn't extend the streak.
+  Future<void> completeRitual([DateTime? now]) async {
+    final today = Dates.todayKey(now);
+    final last = getLastRitualDate();
+    var streak = _prefs.getInt(_k(_streakKey)) ?? 0;
+
+    if (last == today) {
+      streak = streak == 0 ? 1 : streak;
+    } else if (last == Dates.yesterdayKey(now)) {
+      streak++;
+    } else {
+      streak = 1;
+    }
+
+    await _prefs.setInt(_k(_streakKey), streak);
+    await _prefs.setString(_k(_lastRitualDateKey), today);
+    await _prefs.setInt(_k(_totalRitualsKey), getTotalRituals() + 1);
   }
 }
